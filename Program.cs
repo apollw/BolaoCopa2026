@@ -1,13 +1,19 @@
+using BolaoCopa2026.Data;
 using BolaoCopa2026.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddSingleton<ScoringService>();
-builder.Services.AddSingleton<BolaoRepository>();
+builder.Services.AddDbContext<BolaoDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("BolaoDb")));
+builder.Services.AddScoped<ScoringService>();
+builder.Services.AddScoped<BolaoRepository>();
 
 var app = builder.Build();
+
+BolaoSeedData.Initialize(app.Services);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

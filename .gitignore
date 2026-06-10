@@ -34,6 +34,10 @@ appsettings.*.Local.json
 secrets.json
 *.Development.local.json
 
+# Local database files
+Data/*.db
+Data/*.db-*
+
 # Logs and diagnostics
 logs/
 *.log
