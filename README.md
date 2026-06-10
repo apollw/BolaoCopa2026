@@ -16,20 +16,59 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 - Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.
 - Tabela inicial da Copa 2026 com fase de grupos e cruzamentos do mata-mata por posicao.
 - Interface responsiva para dispositivos moveis.
+- Deploy Docker preparado para Render.
 
 ## Como rodar
 
-Na raiz do projeto, execute:
+Local com SQLite:
 
 ```bash
 DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
-Depois acesse:
+Local com Supabase/PostgreSQL:
+
+```bash
+DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+```
+
+Acesse:
 
 ```text
 http://localhost:5086
 ```
+
+Para encerrar a aplicacao local na porta 5086:
+
+```bash
+fuser -k 5086/tcp
+```
+
+## Acessos
+
+Usuario normal:
+
+```text
+/Conta/Cadastro
+/Conta/Login
+/Palpites
+/Palpites/Especiais
+/Conta/Perfil
+```
+
+Admin:
+
+```text
+/Admin/Login
+```
+
+Senha padrao atual:
+
+```text
+Soyuz123
+```
+
+Em producao, prefira configurar `Admin__Password` como variavel de ambiente no servidor.
 
 ## Supabase/PostgreSQL
 
@@ -43,6 +82,8 @@ SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgre
 ```
 
 Use `appsettings.Supabase.example.json` apenas como exemplo. Nao commitar senhas reais.
+
+Em PostgreSQL/Supabase, o app roda migrations automaticamente na inicializacao com `Database.Migrate()` e depois cria apenas dados-base da Copa, sem usuarios mockados.
 
 Para aplicar migrations:
 
@@ -63,6 +104,15 @@ Passos:
 5. Confirme o deploy.
 
 As demais variaveis ficam em `render.yaml`: `Database__Provider=Postgres` e `ASPNETCORE_URLS=http://0.0.0.0:10000`.
+
+Variaveis recomendadas no Render:
+
+```text
+SUPABASE_DATABASE_URL=postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres
+Admin__Password=uma-senha-de-admin
+```
+
+O Render vai gerar uma URL publica do tipo `https://nome-do-servico.onrender.com`.
 
 ## Requisitos
 
