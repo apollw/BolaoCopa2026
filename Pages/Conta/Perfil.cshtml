@@ -25,11 +25,15 @@
                 Login
                 <input type="text" value="@Model.Participant?.Login" readonly />
             </label>
+            <label>
+                ID no banco
+                <input type="text" value="@Model.Participant?.Id" readonly />
+            </label>
         </form>
     </article>
 
     <article class="panel muted-panel">
-        <h2>Auditorias</h2>
-        <p>Este email sera usado para receber os comprovantes dos palpites finalizados e os registros de auditoria do bolao.</p>
+        <h2>Comprovantes</h2>
+        <p>Quando uma rodada for finalizada, o comprovante em imagem fica disponivel na tela de palpites com os metadados do seu cadastro.</p>
     </article>
 </section>

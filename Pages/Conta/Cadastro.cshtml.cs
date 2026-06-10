@@ -67,7 +67,8 @@ public class CadastroModel : PageModel
         {
             new(ClaimTypes.NameIdentifier, participant.Id.ToString()),
             new(ClaimTypes.Name, participant.Name),
-            new(ClaimTypes.Email, participant.Email)
+            new(ClaimTypes.Email, participant.Email),
+            new(ClaimTypes.Role, "Participante")
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

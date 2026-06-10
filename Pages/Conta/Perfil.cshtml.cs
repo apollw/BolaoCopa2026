@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BolaoCopa2026.Pages.Conta;
 
-[Authorize]
+[Authorize(Policy = "ParticipantOnly")]
 public class PerfilModel : PageModel
 {
     private readonly BolaoRepository _repository;

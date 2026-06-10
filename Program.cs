@@ -31,7 +31,40 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LoginPath = "/Conta/Login";
         options.LogoutPath = "/Conta/Logout";
         options.AccessDeniedPath = "/Conta/Login";
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/Admin"))
+            {
+                context.Response.Redirect("/Admin/Login");
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/Admin"))
+            {
+                context.Response.Redirect("/Admin/Login");
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
     });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("ParticipantOnly", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context =>
+            context.User.HasClaim(claim => claim.Type == System.Security.Claims.ClaimTypes.NameIdentifier)
+            && !context.User.IsInRole("Admin"));
+    });
+});
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IPasswordHasher<Participant>, PasswordHasher<Participant>>();
 builder.Services.AddScoped<ScoringService>();

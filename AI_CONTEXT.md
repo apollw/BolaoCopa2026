@@ -70,7 +70,8 @@ Em PostgreSQL/Supabase, `Services/BolaoSeedData.cs` aplica migrations com `Datab
 - `Services/ScoringService.cs`: regra de pontuacao.
 - `Services/AuditImageService.cs`: gera comprovante de auditoria em SVG com metadados e hash.
 - `Pages/Palpites/Index.*`: tela de palpites por rodada.
-- `Pages/Admin/Resultados.*`: registro de resultados reais.
+- `Pages/Admin/Login.*`: login separado do organizador/admin.
+- `Pages/Admin/Resultados.*`: registro de resultados reais protegido por policy `AdminOnly`.
 - `Pages/Conta/Cadastro.*`, `Login.*`, `Logout.*`, `Perfil.*`: fluxo simples de conta.
 - `Pages/Index.*`: dashboard principal.
 - `wwwroot/css/site.css`: estilos principais.
@@ -90,7 +91,7 @@ Campos relevantes:
 - `PasswordHash`
 - `IsAdmin`
 
-O login atualmente usa email/senha e cookie. Ainda nao ha autorizacao real para admin; a pagina admin esta acessivel pela rota.
+O login de participante usa email/senha e cookie. A area admin exige sessao com role `Admin`, criada em `/Admin/Login` pela senha administrativa.
 
 ### PredictionRound
 
@@ -321,12 +322,15 @@ Implementacao:
   - `ClaimTypes.NameIdentifier`: `Participant.Id`
   - `ClaimTypes.Name`
   - `ClaimTypes.Email`
+  - `ClaimTypes.Role`: `Participante`
 
 `BolaoRepository.CurrentParticipantId` tenta ler o claim do usuario autenticado. Se nao houver identificador de participante, dispara excecao em vez de usar fallback.
 
-Proximo passo recomendado:
+Admin:
 
-- criar autorizacao de admin para `/Admin/Resultados`.
+- `/Admin/Login` valida a senha do organizador e cria uma sessao cookie com role `Admin`.
+- `/Admin/Resultados` usa `[Authorize(Policy = "AdminOnly")]`.
+- `/Palpites` e `/Conta/Perfil` usam `ParticipantOnly`, entao admin nao entra como participante.
 
 ## Auditoria
 

@@ -12,7 +12,7 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 - Palpites por rodada com salvamento temporario associado ao usuario autenticado.
 - Finalizacao de rodada para travar os palpites.
 - Comprovante de auditoria em imagem bloqueado enquanto a rodada nao estiver finalizada.
-- Area administrativa para registrar resultado oficial uma unica vez por partida.
+- Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.
 - Tabela inicial da Copa 2026 com fase de grupos e cruzamentos do mata-mata por posicao.
 - Interface responsiva para dispositivos moveis.
 

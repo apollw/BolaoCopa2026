@@ -1,0 +1,38 @@
+@page
+@model BolaoCopa2026.Pages.Admin.LoginModel
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Administracao</p>
+    <h1>Acesso do Organizador</h1>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="notice">@Model.StatusMessage</div>
+}
+
+<section class="profile-layout">
+    <article class="panel">
+        <h2>Senha de admin</h2>
+        <form method="post" class="stacked-form">
+            <label asp-for="Input.Password">
+                Senha
+                <input asp-for="Input.Password" autocomplete="current-password" autofocus />
+                <span asp-validation-for="Input.Password"></span>
+            </label>
+            <button class="btn-app danger" type="submit">Entrar como admin</button>
+        </form>
+    </article>
+
+    <article class="panel muted-panel">
+        <h2>Area restrita</h2>
+        <p>O acesso administrativo e separado dos participantes e serve apenas para registrar resultados oficiais.</p>
+    </article>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

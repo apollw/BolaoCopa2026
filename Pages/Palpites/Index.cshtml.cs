@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BolaoCopa2026.Pages.Palpites;
 
-[Authorize]
+[Authorize(Policy = "ParticipantOnly")]
 public class IndexModel : PageModel
 {
     private readonly AuditImageService _auditImageService;
