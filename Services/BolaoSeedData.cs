@@ -1,5 +1,6 @@
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace BolaoCopa2026.Services;
@@ -13,9 +14,11 @@ public static class BolaoSeedData
 
         Directory.CreateDirectory("Data");
         db.Database.EnsureCreated();
+        EnsureAuthColumns(db);
 
         if (db.Rounds.Any())
         {
+            EnsureMissingMatches(db);
             return;
         }
 
@@ -31,6 +34,75 @@ public static class BolaoSeedData
             new SpecialPrediction { ParticipantId = 3, Champion = "Franca", RunnerUp = "Espanha", TopScorer = "Kane", GoldenBall = "Vinicius Jr." });
 
         db.SaveChanges();
+    }
+
+    private static void EnsureMissingMatches(BolaoDbContext db)
+    {
+        var existingOfficialNumbers = db.Matches.Select(match => match.OfficialNumber).ToHashSet();
+        var nextId = db.Matches.Any() ? db.Matches.Max(match => match.Id) + 1 : 1;
+        var missing = new List<Match>();
+
+        foreach (var match in SeedMatches().Where(match => !existingOfficialNumbers.Contains(match.OfficialNumber)))
+        {
+            missing.Add(new Match
+            {
+                Id = nextId++,
+                OfficialNumber = match.OfficialNumber,
+                RoundId = match.RoundId,
+                HomeTeam = match.HomeTeam,
+                AwayTeam = match.AwayTeam,
+                Phase = match.Phase,
+                Kickoff = match.Kickoff,
+                GroupName = match.GroupName,
+                Venue = match.Venue
+            });
+        }
+
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        db.Matches.AddRange(missing);
+        db.SaveChanges();
+    }
+
+    private static void EnsureAuthColumns(BolaoDbContext db)
+    {
+        TryAddColumn(db, "PasswordHash", "ALTER TABLE Participants ADD COLUMN PasswordHash TEXT NULL");
+        TryAddColumn(db, "IsAdmin", "ALTER TABLE Participants ADD COLUMN IsAdmin INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void TryAddColumn(BolaoDbContext db, string columnName, string sql)
+    {
+        if (ParticipantColumnExists(db, columnName))
+        {
+            return;
+        }
+
+        db.Database.ExecuteSqlRaw(sql);
+    }
+
+    private static bool ParticipantColumnExists(BolaoDbContext db, string columnName)
+    {
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            connection.Open();
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(Participants)";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static List<PredictionRound> SeedRounds()
@@ -50,53 +122,116 @@ public static class BolaoSeedData
 
     private static List<Match> SeedMatches()
     {
-        var teams = SeedTeams();
         var matches = new List<Match>();
         var id = 1;
 
-        void AddGroup(int number, string date, string home, string away, string group, string venue, int hour = 16)
-        {
-            matches.Add(new Match
-            {
-                Id = id++,
-                OfficialNumber = number,
-                RoundId = 1,
-                HomeTeam = teams[home],
-                AwayTeam = teams[away],
-                GroupName = group,
-                Venue = venue,
-                Phase = CompetitionPhase.GroupStage,
-                Kickoff = Kickoff(date, hour)
-            });
-        }
-
-        AddGroup(1, "2026-06-11", "MEX", "RSA", "Grupo A", "Mexico City Stadium");
-        AddGroup(2, "2026-06-11", "KOR", "CZE", "Grupo A", "Estadio Guadalajara", 19);
-        AddGroup(3, "2026-06-12", "CAN", "BIH", "Grupo B", "Toronto Stadium");
-        AddGroup(4, "2026-06-12", "USA", "PAR", "Grupo D", "Los Angeles Stadium", 19);
-        AddGroup(5, "2026-06-13", "HAI", "SCO", "Grupo C", "Boston Stadium", 13);
-        AddGroup(6, "2026-06-13", "AUS", "TUR", "Grupo D", "BC Place Vancouver", 16);
-        AddGroup(7, "2026-06-13", "BRA", "MAR", "Grupo C", "New York New Jersey Stadium", 19);
-        AddGroup(8, "2026-06-13", "QAT", "SUI", "Grupo B", "San Francisco Bay Area Stadium", 22);
-        AddGroup(9, "2026-06-14", "CIV", "ECU", "Grupo E", "Philadelphia Stadium", 13);
-        AddGroup(10, "2026-06-14", "GER", "CUW", "Grupo E", "Houston Stadium", 16);
-        AddGroup(11, "2026-06-14", "NED", "JPN", "Grupo F", "Dallas Stadium", 19);
-        AddGroup(12, "2026-06-14", "SWE", "TUN", "Grupo F", "Estadio Monterrey", 22);
-        AddGroup(13, "2026-06-15", "KSA", "URU", "Grupo H", "Miami Stadium", 13);
-        AddGroup(14, "2026-06-15", "ESP", "CPV", "Grupo H", "Atlanta Stadium", 16);
-        AddGroup(15, "2026-06-15", "IRN", "NZL", "Grupo G", "Los Angeles Stadium", 19);
-        AddGroup(16, "2026-06-15", "BEL", "EGY", "Grupo G", "Seattle Stadium", 22);
-        AddGroup(17, "2026-06-16", "FRA", "SEN", "Grupo I", "New York New Jersey Stadium", 13);
-        AddGroup(18, "2026-06-16", "IRQ", "NOR", "Grupo I", "Boston Stadium", 16);
-        AddGroup(19, "2026-06-16", "ARG", "ALG", "Grupo J", "Kansas City Stadium", 19);
-        AddGroup(20, "2026-06-16", "AUT", "JOR", "Grupo J", "San Francisco Bay Area Stadium", 22);
-        AddGroup(21, "2026-06-17", "GHA", "PAN", "Grupo L", "Toronto Stadium", 13);
-        AddGroup(22, "2026-06-17", "ENG", "CRO", "Grupo L", "Dallas Stadium", 16);
-        AddGroup(23, "2026-06-17", "POR", "COD", "Grupo K", "Houston Stadium", 19);
-        AddGroup(24, "2026-06-17", "UZB", "COL", "Grupo K", "Mexico City Stadium", 22);
-
+        AddGroupStage(matches, ref id);
         AddKnockout(matches, id);
         return matches;
+    }
+
+    private static void AddGroupStage(List<Match> matches, ref int id)
+    {
+        var nextId = id;
+        var number = 1;
+        var groups = SeedGroups().ToDictionary(group => group.Code);
+
+        void AddMatchday1(string groupCode, int pairing, string venue, int hour)
+        {
+            var group = groups[groupCode];
+            if (pairing == 1)
+            {
+                AddGroupMatch(matches, nextId++, number++, 1, group.Code, group.Team1, group.Team2, group.Matchday1Date, venue, hour);
+                return;
+            }
+
+            AddGroupMatch(matches, nextId++, number++, 1, group.Code, group.Team3, group.Team4, group.Matchday1Date, venue, hour);
+        }
+
+        AddMatchday1("A", 1, "Mexico City Stadium", 16);
+        AddMatchday1("A", 2, "Estadio Guadalajara", 19);
+        AddMatchday1("B", 1, "Toronto Stadium", 16);
+        AddMatchday1("D", 1, "Los Angeles Stadium", 19);
+        AddMatchday1("C", 2, "Boston Stadium", 13);
+        AddMatchday1("D", 2, "BC Place Vancouver", 16);
+        AddMatchday1("C", 1, "New York New Jersey Stadium", 19);
+        AddMatchday1("B", 2, "San Francisco Bay Area Stadium", 22);
+        AddMatchday1("E", 1, "Philadelphia Stadium", 13);
+        AddMatchday1("E", 2, "Houston Stadium", 16);
+        AddMatchday1("F", 1, "Dallas Stadium", 19);
+        AddMatchday1("F", 2, "Estadio Monterrey", 22);
+        AddMatchday1("H", 1, "Miami Stadium", 13);
+        AddMatchday1("H", 2, "Atlanta Stadium", 16);
+        AddMatchday1("G", 1, "Los Angeles Stadium", 19);
+        AddMatchday1("G", 2, "Seattle Stadium", 22);
+        AddMatchday1("I", 1, "New York New Jersey Stadium", 13);
+        AddMatchday1("I", 2, "Boston Stadium", 16);
+        AddMatchday1("J", 1, "Kansas City Stadium", 19);
+        AddMatchday1("J", 2, "San Francisco Bay Area Stadium", 22);
+        AddMatchday1("L", 1, "Toronto Stadium", 13);
+        AddMatchday1("L", 2, "Dallas Stadium", 16);
+        AddMatchday1("K", 1, "Houston Stadium", 19);
+        AddMatchday1("K", 2, "Mexico City Stadium", 22);
+
+        foreach (var group in groups.Values.OrderBy(group => group.Code))
+        {
+            AddGroupMatch(matches, nextId++, number++, 2, group.Code, group.Team1, group.Team3, group.Matchday2Date, "A definir", 16);
+            AddGroupMatch(matches, nextId++, number++, 2, group.Code, group.Team4, group.Team2, group.Matchday2Date, "A definir", 19);
+        }
+
+        foreach (var group in groups.Values.OrderBy(group => group.Code))
+        {
+            AddGroupMatch(matches, nextId++, number++, 3, group.Code, group.Team4, group.Team1, group.Matchday3Date, "A definir", 16);
+            AddGroupMatch(matches, nextId++, number++, 3, group.Code, group.Team2, group.Team3, group.Matchday3Date, "A definir", 19);
+        }
+
+        id = nextId;
+    }
+
+    private static void AddGroupMatch(
+        List<Match> matches,
+        int id,
+        int number,
+        int roundId,
+        string groupCode,
+        Team home,
+        Team away,
+        string date,
+        string venue,
+        int hour)
+    {
+        matches.Add(new Match
+        {
+            Id = id,
+            OfficialNumber = number,
+            RoundId = roundId,
+            HomeTeam = home,
+            AwayTeam = away,
+            GroupName = $"Grupo {groupCode}",
+            Venue = venue,
+            Phase = CompetitionPhase.GroupStage,
+            Kickoff = Kickoff(date, hour)
+        });
+    }
+
+    private static List<GroupSeed> SeedGroups()
+    {
+        var teams = SeedTeams();
+        return
+        [
+            new("A", teams["MEX"], teams["RSA"], teams["KOR"], teams["CZE"], "2026-06-11", "2026-06-18", "2026-06-24", "Mexico City Stadium", "Estadio Guadalajara", 16, 19),
+            new("B", teams["CAN"], teams["BIH"], teams["QAT"], teams["SUI"], "2026-06-12", "2026-06-18", "2026-06-24", "Toronto Stadium", "San Francisco Bay Area Stadium", 16, 22),
+            new("C", teams["BRA"], teams["MAR"], teams["HAI"], teams["SCO"], "2026-06-13", "2026-06-19", "2026-06-24", "New York New Jersey Stadium", "Boston Stadium", 19, 13),
+            new("D", teams["USA"], teams["PAR"], teams["AUS"], teams["TUR"], "2026-06-12", "2026-06-19", "2026-06-25", "Los Angeles Stadium", "BC Place Vancouver", 19, 16),
+            new("E", teams["CIV"], teams["ECU"], teams["GER"], teams["CUW"], "2026-06-14", "2026-06-20", "2026-06-25", "Philadelphia Stadium", "Houston Stadium", 13, 16),
+            new("F", teams["NED"], teams["JPN"], teams["SWE"], teams["TUN"], "2026-06-14", "2026-06-20", "2026-06-25", "Dallas Stadium", "Estadio Monterrey", 19, 22),
+            new("G", teams["IRN"], teams["NZL"], teams["BEL"], teams["EGY"], "2026-06-15", "2026-06-21", "2026-06-26", "Los Angeles Stadium", "Seattle Stadium", 19, 22),
+            new("H", teams["KSA"], teams["URU"], teams["ESP"], teams["CPV"], "2026-06-15", "2026-06-21", "2026-06-26", "Miami Stadium", "Atlanta Stadium", 13, 16),
+            new("I", teams["FRA"], teams["SEN"], teams["IRQ"], teams["NOR"], "2026-06-16", "2026-06-22", "2026-06-26", "New York New Jersey Stadium", "Boston Stadium", 13, 16),
+            new("J", teams["ARG"], teams["ALG"], teams["AUT"], teams["JOR"], "2026-06-16", "2026-06-22", "2026-06-27", "Kansas City Stadium", "San Francisco Bay Area Stadium", 19, 22),
+            new("K", teams["POR"], teams["COD"], teams["UZB"], teams["COL"], "2026-06-17", "2026-06-23", "2026-06-27", "Houston Stadium", "Mexico City Stadium", 19, 22),
+            new("L", teams["GHA"], teams["PAN"], teams["ENG"], teams["CRO"], "2026-06-17", "2026-06-23", "2026-06-27", "Toronto Stadium", "Dallas Stadium", 13, 16)
+        ];
     }
 
     private static Dictionary<string, Team> SeedTeams()
@@ -213,4 +348,18 @@ public static class BolaoSeedData
         var parsed = DateOnly.Parse(date);
         return new DateTimeOffset(parsed.Year, parsed.Month, parsed.Day, hour, 0, 0, TimeSpan.FromHours(-3));
     }
+
+    private sealed record GroupSeed(
+        string Code,
+        Team Team1,
+        Team Team2,
+        Team Team3,
+        Team Team4,
+        string Matchday1Date,
+        string Matchday2Date,
+        string Matchday3Date,
+        string Matchday1Venue1,
+        string Matchday1Venue2,
+        int Matchday1Hour1,
+        int Matchday1Hour2);
 }

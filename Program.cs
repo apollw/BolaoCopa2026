@@ -1,5 +1,8 @@
 using BolaoCopa2026.Data;
+using BolaoCopa2026.Models;
 using BolaoCopa2026.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +11,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<BolaoDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("BolaoDb")));
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Conta/Login";
+        options.LogoutPath = "/Conta/Logout";
+        options.AccessDeniedPath = "/Conta/Login";
+    });
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IPasswordHasher<Participant>, PasswordHasher<Participant>>();
 builder.Services.AddScoped<ScoringService>();
 builder.Services.AddScoped<BolaoRepository>();
 
@@ -27,6 +39,7 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

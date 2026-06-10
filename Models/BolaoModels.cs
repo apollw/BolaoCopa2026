@@ -27,8 +27,8 @@ public sealed class Match
     public int Id { get; init; }
     public int OfficialNumber { get; init; }
     public int RoundId { get; init; }
-    public required Team HomeTeam { get; init; }
-    public required Team AwayTeam { get; init; }
+    public required Team HomeTeam { get; set; }
+    public required Team AwayTeam { get; set; }
     public CompetitionPhase Phase { get; init; }
     public DateTimeOffset Kickoff { get; init; }
     public string? GroupName { get; init; }
@@ -49,10 +49,12 @@ public sealed class MatchResult
 
 public sealed class Participant
 {
-    public int Id { get; init; }
-    public required string Name { get; init; }
-    public required string Email { get; init; }
-    public required string Login { get; init; }
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public required string Email { get; set; }
+    public required string Login { get; set; }
+    public string? PasswordHash { get; set; }
+    public bool IsAdmin { get; set; }
 }
 
 public sealed class Prediction
@@ -90,6 +92,7 @@ public sealed class DashboardStats
 {
     public required IReadOnlyList<RankingEntry> Ranking { get; init; }
     public required IReadOnlyList<PredictionRound> Rounds { get; init; }
+    public required IReadOnlyList<GroupStanding> GroupStandings { get; init; }
     public required IReadOnlyList<Match> UpcomingMatches { get; init; }
     public required IReadOnlyList<Match> CompletedMatches { get; init; }
     public required IReadOnlyList<SpecialPrediction> SpecialPredictions { get; init; }
@@ -103,9 +106,11 @@ public sealed class RoundPredictionView
 {
     public required PredictionRound Round { get; init; }
     public required IReadOnlyList<MatchPredictionView> Matches { get; init; }
+    public bool IsLocked { get; init; }
     public bool IsFinalized { get; init; }
     public int DraftCount { get; init; }
-    public bool CanSendAudit => IsFinalized;
+    public string? LockReason { get; init; }
+    public bool CanSendAudit => IsFinalized && !IsLocked;
 }
 
 public sealed class MatchPredictionView
@@ -121,4 +126,23 @@ public sealed class ResultAudit
     public required string RegisteredBy { get; init; }
     public DateTimeOffset RegisteredAt { get; init; }
     public required string Summary { get; init; }
+}
+
+public sealed class GroupStanding
+{
+    public required string GroupName { get; init; }
+    public required IReadOnlyList<GroupStandingEntry> Entries { get; init; }
+}
+
+public sealed class GroupStandingEntry
+{
+    public required Team Team { get; init; }
+    public int Played { get; init; }
+    public int Wins { get; init; }
+    public int Draws { get; init; }
+    public int Losses { get; init; }
+    public int GoalsFor { get; init; }
+    public int GoalsAgainst { get; init; }
+    public int GoalDifference => GoalsFor - GoalsAgainst;
+    public int Points { get; init; }
 }

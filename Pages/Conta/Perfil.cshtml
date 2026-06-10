@@ -14,23 +14,22 @@
         <h2>Acesso</h2>
         <form class="stacked-form">
             <label>
-                Login
-                <input type="text" value="participante.demo" />
+                Nome
+                <input type="text" value="@Model.Participant?.Name" readonly />
             </label>
             <label>
                 Email
-                <input type="email" value="participante@example.com" />
+                <input type="email" value="@Model.Participant?.Email" readonly />
             </label>
             <label>
-                Senha
-                <input type="password" value="password" />
+                Login
+                <input type="text" value="@Model.Participant?.Login" readonly />
             </label>
-            <button class="btn-app" type="button">Atualizar perfil</button>
         </form>
     </article>
 
     <article class="panel muted-panel">
-        <h2>Proxima etapa tecnica</h2>
-        <p>Esta tela reserva o fluxo de login e senha. A implementacao definitiva deve usar ASP.NET Core Identity com banco de dados para autenticar participantes e administradores.</p>
+        <h2>Auditorias</h2>
+        <p>Este email sera usado para receber os comprovantes dos palpites finalizados e os registros de auditoria do bolao.</p>
     </article>
 </section>

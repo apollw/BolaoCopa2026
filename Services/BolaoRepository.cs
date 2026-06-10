@@ -1,6 +1,7 @@
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace BolaoCopa2026.Services;
 
@@ -9,29 +10,52 @@ public sealed class BolaoRepository
     private const int MockParticipantId = 1;
 
     private readonly BolaoDbContext _db;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ScoringService _scoringService;
 
-    public BolaoRepository(BolaoDbContext db, ScoringService scoringService)
+    public BolaoRepository(BolaoDbContext db, IHttpContextAccessor httpContextAccessor, ScoringService scoringService)
     {
         _db = db;
+        _httpContextAccessor = httpContextAccessor;
         _scoringService = scoringService;
     }
 
-    public int CurrentParticipantId => MockParticipantId;
+    public int CurrentParticipantId
+    {
+        get
+        {
+            var id = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return int.TryParse(id, out var participantId) ? participantId : MockParticipantId;
+        }
+    }
+
+    public Participant? CurrentParticipant => _db.Participants.SingleOrDefault(participant => participant.Id == CurrentParticipantId);
     public IReadOnlyList<PredictionRound> Rounds => _db.Rounds.OrderBy(round => round.Id).ToList();
-    public IReadOnlyList<Match> Matches => _db.Matches.OrderBy(match => match.Kickoff).ThenBy(match => match.OfficialNumber).ToList();
+    public IReadOnlyList<Match> Matches => _db.Matches
+        .ToList()
+        .OrderBy(match => match.Kickoff)
+        .ThenBy(match => match.OfficialNumber)
+        .ToList();
     public IReadOnlyList<Participant> Participants => _db.Participants.OrderBy(participant => participant.Name).ToList();
-    public IReadOnlyList<ResultAudit> Audits => _db.ResultAudits.OrderByDescending(audit => audit.RegisteredAt).ToList();
+    public IReadOnlyList<ResultAudit> Audits => _db.ResultAudits
+        .ToList()
+        .OrderByDescending(audit => audit.RegisteredAt)
+        .ToList();
 
     public DashboardStats GetDashboard()
     {
-        var matches = _db.Matches.OrderBy(match => match.Kickoff).ThenBy(match => match.OfficialNumber).ToList();
+        var matches = _db.Matches
+            .ToList()
+            .OrderBy(match => match.Kickoff)
+            .ThenBy(match => match.OfficialNumber)
+            .ToList();
         var completed = matches.Where(match => match.Result is not null).ToList();
 
         return new DashboardStats
         {
             Ranking = GetRanking(),
             Rounds = Rounds,
+            GroupStandings = GetGroupStandings(),
             UpcomingMatches = matches.Where(match => match.Result is null).Take(8).ToList(),
             CompletedMatches = completed.OrderByDescending(match => match.Kickoff).ToList(),
             SpecialPredictions = _db.SpecialPredictions.OrderBy(prediction => prediction.ParticipantId).ToList(),
@@ -46,8 +70,10 @@ public sealed class BolaoRepository
     {
         var rounds = Rounds;
         var selectedRound = rounds.SingleOrDefault(round => round.Id == roundId) ?? rounds.First();
+        var isLocked = !IsRoundAvailable(participantId, selectedRound.Id, out var lockReason);
         var roundMatches = _db.Matches
             .Where(match => match.RoundId == selectedRound.Id)
+            .ToList()
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
@@ -68,6 +94,8 @@ public sealed class BolaoRepository
         {
             Round = selectedRound,
             Matches = matches,
+            IsLocked = isLocked,
+            LockReason = lockReason,
             IsFinalized = matches.Count > 0 && matches.All(item => item.Prediction?.IsFinal == true),
             DraftCount = matches.Count(item => item.Prediction is { IsFinal: false })
         };
@@ -79,6 +107,12 @@ public sealed class BolaoRepository
         if (match is null)
         {
             message = "Partida nao encontrada.";
+            return false;
+        }
+
+        if (!IsRoundAvailable(participantId, match.RoundId, out var lockReason))
+        {
+            message = lockReason ?? "Esta rodada ainda esta bloqueada.";
             return false;
         }
 
@@ -122,6 +156,12 @@ public sealed class BolaoRepository
 
     public bool FinalizeRound(int participantId, int roundId, out string message)
     {
+        if (!IsRoundAvailable(participantId, roundId, out var lockReason))
+        {
+            message = lockReason ?? "Esta rodada ainda esta bloqueada.";
+            return false;
+        }
+
         var roundMatchIds = _db.Matches
             .Where(match => match.RoundId == roundId)
             .Select(match => match.Id)
@@ -150,6 +190,57 @@ public sealed class BolaoRepository
     public bool CanSendPredictionAudit(int participantId, int roundId)
     {
         return GetRoundPrediction(participantId, roundId).CanSendAudit;
+    }
+
+    public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
+    {
+        reason = null;
+        if (roundId <= 1)
+        {
+            return true;
+        }
+
+        if (roundId is 2 or 3)
+        {
+            var previousRoundId = roundId - 1;
+            var previousMatchIds = _db.Matches
+                .Where(match => match.RoundId == previousRoundId)
+                .Select(match => match.Id)
+                .ToList();
+            var finalizedCount = _db.Predictions.Count(prediction =>
+                prediction.ParticipantId == participantId
+                && previousMatchIds.Contains(prediction.MatchId)
+                && prediction.SubmittedAt != null);
+
+            if (finalizedCount == previousMatchIds.Count)
+            {
+                return true;
+            }
+
+            reason = $"Finalize a rodada {previousRoundId} antes de preencher esta rodada.";
+            return false;
+        }
+
+        if (roundId == 4)
+        {
+            if (AreAllGroupStageResultsRegistered())
+            {
+                return true;
+            }
+
+            reason = "O mata-mata sera liberado quando o admin registrar todos os resultados reais da fase de grupos.";
+            return false;
+        }
+
+        var previousKnockoutRoundId = roundId - 1;
+        var previousMatches = _db.Matches.Where(match => match.RoundId == previousKnockoutRoundId).ToList();
+        if (previousMatches.Count > 0 && previousMatches.All(match => match.Result is not null))
+        {
+            return true;
+        }
+
+        reason = "Esta fase sera liberada apos o fechamento da fase anterior.";
+        return false;
     }
 
     public IReadOnlyList<RankingEntry> GetRanking()
@@ -224,7 +315,189 @@ public sealed class BolaoRepository
         });
 
         _db.SaveChanges();
+        TryApplyKnockoutPairings();
         message = "Resultado registrado e bloqueado para edicao.";
         return true;
+    }
+
+    public IReadOnlyList<GroupStanding> GetGroupStandings()
+    {
+        return _db.Matches
+            .ToList()
+            .Where(match => match.Phase == CompetitionPhase.GroupStage && !string.IsNullOrWhiteSpace(match.GroupName))
+            .GroupBy(match => match.GroupName!)
+            .OrderBy(group => group.Key)
+            .Select(group => new GroupStanding
+            {
+                GroupName = group.Key,
+                Entries = BuildGroupEntries(group.ToList())
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<GroupStandingEntry> BuildGroupEntries(IReadOnlyList<Match> matches)
+    {
+        var entries = new Dictionary<string, MutableGroupStanding>();
+
+        foreach (var match in matches)
+        {
+            EnsureTeam(entries, match.HomeTeam);
+            EnsureTeam(entries, match.AwayTeam);
+
+            if (match.Result is null)
+            {
+                continue;
+            }
+
+            ApplyResult(entries[match.HomeTeam.Code], match.Result.HomeGoals, match.Result.AwayGoals);
+            ApplyResult(entries[match.AwayTeam.Code], match.Result.AwayGoals, match.Result.HomeGoals);
+        }
+
+        return entries.Values
+            .Select(entry => entry.ToEntry())
+            .OrderByDescending(entry => entry.Points)
+            .ThenByDescending(entry => entry.GoalDifference)
+            .ThenByDescending(entry => entry.GoalsFor)
+            .ThenBy(entry => entry.Team.Name)
+            .ToList();
+    }
+
+    private static void EnsureTeam(Dictionary<string, MutableGroupStanding> entries, Team team)
+    {
+        entries.TryAdd(team.Code, new MutableGroupStanding(team));
+    }
+
+    private static void ApplyResult(MutableGroupStanding entry, int goalsFor, int goalsAgainst)
+    {
+        entry.Played++;
+        entry.GoalsFor += goalsFor;
+        entry.GoalsAgainst += goalsAgainst;
+
+        if (goalsFor > goalsAgainst)
+        {
+            entry.Wins++;
+            entry.Points += 3;
+            return;
+        }
+
+        if (goalsFor == goalsAgainst)
+        {
+            entry.Draws++;
+            entry.Points += 1;
+            return;
+        }
+
+        entry.Losses++;
+    }
+
+    private bool AreAllGroupStageResultsRegistered()
+    {
+        return _db.Matches
+            .Where(match => match.Phase == CompetitionPhase.GroupStage)
+            .ToList()
+            .All(match => match.Result is not null);
+    }
+
+    private void TryApplyKnockoutPairings()
+    {
+        if (!AreAllGroupStageResultsRegistered())
+        {
+            return;
+        }
+
+        var standings = GetGroupStandings()
+            .ToDictionary(standing => standing.GroupName.Replace("Grupo ", string.Empty), standing => standing.Entries);
+        var thirdPlaces = standings
+            .Select(item => new { Group = item.Key, Entry = item.Value.ElementAt(2) })
+            .OrderByDescending(item => item.Entry.Points)
+            .ThenByDescending(item => item.Entry.GoalDifference)
+            .ThenByDescending(item => item.Entry.GoalsFor)
+            .Take(8)
+            .ToList();
+        var usedThirdGroups = new HashSet<string>();
+
+        Team Resolve(string token)
+        {
+            if (token.StartsWith('1') || token.StartsWith('2'))
+            {
+                var index = token[0] == '1' ? 0 : 1;
+                return standings[token[1].ToString()][index].Team;
+            }
+
+            if (token.StartsWith('3'))
+            {
+                var allowedGroups = token[1..].Split('/', StringSplitOptions.RemoveEmptyEntries);
+                var third = thirdPlaces.FirstOrDefault(item => allowedGroups.Contains(item.Group) && usedThirdGroups.Add(item.Group));
+                return third?.Entry.Team ?? new Team(token, token);
+            }
+
+            return new Team(token, token);
+        }
+
+        var pairings = new Dictionary<int, (string Home, string Away)>
+        {
+            [73] = ("2A", "2B"),
+            [74] = ("1E", "3A/B/C/D/F"),
+            [75] = ("1F", "2C"),
+            [76] = ("1C", "2F"),
+            [77] = ("1I", "3C/D/F/G/H"),
+            [78] = ("2E", "2I"),
+            [79] = ("1A", "3C/E/F/H/I"),
+            [80] = ("1L", "3E/H/I/J/K"),
+            [81] = ("1D", "3B/E/F/I/J"),
+            [82] = ("1G", "3A/E/H/I/J"),
+            [83] = ("2K", "2L"),
+            [84] = ("1H", "2J"),
+            [85] = ("1B", "3E/F/G/I/J"),
+            [86] = ("1J", "2H"),
+            [87] = ("1K", "3D/E/I/J/L"),
+            [88] = ("2D", "2G")
+        };
+
+        foreach (var (officialNumber, pairing) in pairings)
+        {
+            var match = _db.Matches.SingleOrDefault(item => item.OfficialNumber == officialNumber);
+            if (match is null || match.Result is not null)
+            {
+                continue;
+            }
+
+            match.HomeTeam = Resolve(pairing.Home);
+            match.AwayTeam = Resolve(pairing.Away);
+        }
+
+        _db.SaveChanges();
+    }
+
+    private sealed class MutableGroupStanding
+    {
+        public MutableGroupStanding(Team team)
+        {
+            Team = team;
+        }
+
+        public Team Team { get; }
+        public int Played { get; set; }
+        public int Wins { get; set; }
+        public int Draws { get; set; }
+        public int Losses { get; set; }
+        public int GoalsFor { get; set; }
+        public int GoalsAgainst { get; set; }
+        public int Points { get; set; }
+
+        public GroupStandingEntry ToEntry()
+        {
+            return new GroupStandingEntry
+            {
+                Team = Team,
+                Played = Played,
+                Wins = Wins,
+                Draws = Draws,
+                Losses = Losses,
+                GoalsFor = GoalsFor,
+                GoalsAgainst = GoalsAgainst,
+                Points = Points
+            };
+        }
     }
 }

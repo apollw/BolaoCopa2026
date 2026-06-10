@@ -57,9 +57,11 @@ public sealed class BolaoDbContext : DbContext
         {
             entity.HasKey(participant => participant.Id);
             entity.HasIndex(participant => participant.Login).IsUnique();
+            entity.HasIndex(participant => participant.Email).IsUnique();
             entity.Property(participant => participant.Name).HasMaxLength(100);
             entity.Property(participant => participant.Email).HasMaxLength(180);
             entity.Property(participant => participant.Login).HasMaxLength(80);
+            entity.Property(participant => participant.PasswordHash).HasMaxLength(500);
         });
 
         modelBuilder.Entity<Prediction>(entity =>

@@ -15,6 +15,7 @@ public class IndexModel : PageModel
     }
 
     public IReadOnlyList<PredictionRound> Rounds { get; private set; } = [];
+    public IReadOnlySet<int> AvailableRoundIds { get; private set; } = new HashSet<int>();
     public RoundPredictionView RoundView { get; private set; } = default!;
 
     public void OnGet(int? roundId)
@@ -38,8 +39,9 @@ public class IndexModel : PageModel
 
     public IActionResult OnPostSendAudit(int roundId)
     {
+        var participant = _repository.CurrentParticipant;
         TempData["Status"] = _repository.CanSendPredictionAudit(_repository.CurrentParticipantId, roundId)
-            ? "Auditoria da rodada enviada por email para o participante mockado."
+            ? $"Auditoria da rodada enviada para {participant?.Email ?? "o email cadastrado"}."
             : "Auditoria bloqueada: finalize a rodada antes do envio.";
 
         return RedirectToPage(new { roundId });
@@ -48,6 +50,10 @@ public class IndexModel : PageModel
     private void LoadData(int? roundId)
     {
         Rounds = _repository.Rounds;
+        AvailableRoundIds = Rounds
+            .Where(round => _repository.IsRoundAvailable(_repository.CurrentParticipantId, round.Id, out _))
+            .Select(round => round.Id)
+            .ToHashSet();
         RoundView = _repository.GetRoundPrediction(_repository.CurrentParticipantId, roundId);
     }
 }

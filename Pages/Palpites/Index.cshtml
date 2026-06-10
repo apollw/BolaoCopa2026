@@ -21,16 +21,22 @@
             <span>@Model.RoundView.Round.StartsOn.ToString("dd/MM") a @Model.RoundView.Round.EndsOn.ToString("dd/MM")</span>
         </div>
         <div class="round-status @(Model.RoundView.IsFinalized ? "final" : "draft")">
-            @(Model.RoundView.IsFinalized ? "finalizada" : $"{Model.RoundView.DraftCount} rascunhos")
+            @(Model.RoundView.IsLocked ? "bloqueada" : Model.RoundView.IsFinalized ? "finalizada" : $"{Model.RoundView.DraftCount} rascunhos")
         </div>
     </div>
 
     <nav class="round-tabs" aria-label="Rodadas">
         @foreach (var round in Model.Rounds)
         {
-            <a class="@(round.Id == Model.RoundView.Round.Id ? "active" : null)" asp-page="/Palpites/Index" asp-route-roundId="@round.Id">@round.Name</a>
+            var isAvailable = Model.AvailableRoundIds.Contains(round.Id);
+            <a class="@(round.Id == Model.RoundView.Round.Id ? "active" : null) @(!isAvailable ? "locked" : null)" asp-page="/Palpites/Index" asp-route-roundId="@round.Id">@round.Name</a>
         }
     </nav>
+
+    @if (Model.RoundView.IsLocked)
+    {
+        <div class="notice">@Model.RoundView.LockReason</div>
+    }
 
     <div class="match-list">
         @foreach (var item in Model.RoundView.Matches)
@@ -49,18 +55,18 @@
                 <form method="post" asp-page-handler="SaveDraft" class="score-form">
                     <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
                     <input type="hidden" name="matchId" value="@match.Id" />
-                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@Model.RoundView.IsFinalized" />
+                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
                     <span>x</span>
-                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@Model.RoundView.IsFinalized" />
+                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
                     @if (match.IsKnockout)
                     {
-                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@Model.RoundView.IsFinalized">
+                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">
                             <option value="">Classificado</option>
                             <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@match.HomeTeam.Name</option>
                             <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@match.AwayTeam.Name</option>
                         </select>
                     }
-                    <button type="submit" class="btn-app" disabled="@Model.RoundView.IsFinalized">Salvar rascunho</button>
+                    <button type="submit" class="btn-app" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Salvar rascunho</button>
                 </form>
             </article>
         }
@@ -75,7 +81,7 @@
     <div class="action-buttons">
         <form method="post" asp-page-handler="FinalizeRound">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
-            <button type="submit" class="btn-app danger" disabled="@Model.RoundView.IsFinalized">Finalizar rodada</button>
+            <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
         </form>
         <form method="post" asp-page-handler="SendAudit">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
