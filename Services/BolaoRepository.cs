@@ -7,8 +7,6 @@ namespace BolaoCopa2026.Services;
 
 public sealed class BolaoRepository
 {
-    private const int MockParticipantId = 1;
-
     private readonly BolaoDbContext _db;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ScoringService _scoringService;
@@ -25,7 +23,12 @@ public sealed class BolaoRepository
         get
         {
             var id = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            return int.TryParse(id, out var participantId) ? participantId : MockParticipantId;
+            if (int.TryParse(id, out var participantId))
+            {
+                return participantId;
+            }
+
+            throw new InvalidOperationException("Usuario autenticado sem identificador de participante.");
         }
     }
 
@@ -96,7 +99,7 @@ public sealed class BolaoRepository
             Matches = matches,
             IsLocked = isLocked,
             LockReason = lockReason,
-            IsFinalized = matches.Count > 0 && matches.All(item => item.Prediction?.IsFinal == true),
+            IsFinalized = IsRoundFinalized(participantId, selectedRound.Id),
             DraftCount = matches.Count(item => item.Prediction is { IsFinal: false })
         };
     }
@@ -150,7 +153,7 @@ public sealed class BolaoRepository
         }
 
         _db.SaveChanges();
-        message = "Rascunho salvo no banco e associado ao perfil do participante mockado.";
+        message = "Rascunho salvo no banco e associado ao seu perfil.";
         return true;
     }
 
@@ -182,8 +185,19 @@ public sealed class BolaoRepository
             prediction.SubmittedAt = DateTimeOffset.UtcNow;
         }
 
+        var submission = _db.RoundSubmissions.SingleOrDefault(item => item.ParticipantId == participantId && item.RoundId == roundId);
+        if (submission is null)
+        {
+            _db.RoundSubmissions.Add(new RoundSubmission
+            {
+                ParticipantId = participantId,
+                RoundId = roundId,
+                SubmittedAt = DateTimeOffset.UtcNow
+            });
+        }
+
         _db.SaveChanges();
-        message = "Rodada finalizada. Agora a auditoria desta rodada pode ser enviada por email.";
+        message = "Rodada finalizada. Agora o comprovante de auditoria pode ser baixado.";
         return true;
     }
 
@@ -203,16 +217,7 @@ public sealed class BolaoRepository
         if (roundId is 2 or 3)
         {
             var previousRoundId = roundId - 1;
-            var previousMatchIds = _db.Matches
-                .Where(match => match.RoundId == previousRoundId)
-                .Select(match => match.Id)
-                .ToList();
-            var finalizedCount = _db.Predictions.Count(prediction =>
-                prediction.ParticipantId == participantId
-                && previousMatchIds.Contains(prediction.MatchId)
-                && prediction.SubmittedAt != null);
-
-            if (finalizedCount == previousMatchIds.Count)
+            if (IsRoundFinalized(participantId, previousRoundId))
             {
                 return true;
             }
@@ -274,6 +279,11 @@ public sealed class BolaoRepository
             .ThenByDescending(entry => entry.ResultHits)
             .ThenBy(entry => entry.Participant.Name)
             .ToList();
+    }
+
+    public bool IsRoundFinalized(int participantId, int roundId)
+    {
+        return _db.RoundSubmissions.Any(item => item.ParticipantId == participantId && item.RoundId == roundId);
     }
 
     public bool TryRegisterResult(int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode, string registeredBy, out string message)

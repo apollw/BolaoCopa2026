@@ -323,6 +323,10 @@ a {
   text-decoration: none;
 }
 
+.btn-app.link-button.no-margin {
+  margin-top: 0;
+}
+
 .btn-app.secondary {
   background: #31443a;
 }

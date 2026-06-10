@@ -76,17 +76,21 @@
 <section class="panel action-panel">
     <div>
         <h2>Fechamento da rodada</h2>
-        <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e a auditoria por email permanece bloqueada.</p>
+        <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
     </div>
     <div class="action-buttons">
         <form method="post" asp-page-handler="FinalizeRound">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
             <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
         </form>
-        <form method="post" asp-page-handler="SendAudit">
-            <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
-            <button type="submit" class="btn-app secondary" disabled="@(!Model.RoundView.CanSendAudit)">Enviar auditoria</button>
-        </form>
+        @if (Model.RoundView.CanSendAudit)
+        {
+            <a class="btn-app secondary link-button no-margin" asp-page-handler="DownloadAudit" asp-route-roundId="@Model.RoundView.Round.Id">Baixar comprovante</a>
+        }
+        else
+        {
+            <button type="button" class="btn-app secondary" disabled>Baixar comprovante</button>
+        }
     </div>
 </section>
 

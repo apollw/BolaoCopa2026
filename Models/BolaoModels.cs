@@ -69,6 +69,16 @@ public sealed class Prediction
     public bool IsFinal => SubmittedAt is not null;
 }
 
+public sealed class RoundSubmission
+{
+    public int Id { get; init; }
+    public int ParticipantId { get; init; }
+    public int RoundId { get; init; }
+    public DateTimeOffset SubmittedAt { get; set; }
+    public DateTimeOffset? AuditDownloadedAt { get; set; }
+    public string? AuditProofHash { get; set; }
+}
+
 public sealed class SpecialPrediction
 {
     public int ParticipantId { get; init; }
@@ -145,4 +155,25 @@ public sealed class GroupStandingEntry
     public int GoalsAgainst { get; init; }
     public int GoalDifference => GoalsFor - GoalsAgainst;
     public int Points { get; init; }
+}
+
+public sealed class AuditSnapshot
+{
+    public required Participant Participant { get; init; }
+    public required PredictionRound Round { get; init; }
+    public required IReadOnlyList<AuditPredictionLine> Predictions { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string ProofHash { get; init; }
+}
+
+public sealed class AuditPredictionLine
+{
+    public required int OfficialNumber { get; init; }
+    public required string HomeTeam { get; init; }
+    public required string AwayTeam { get; init; }
+    public required int HomeGoals { get; init; }
+    public required int AwayGoals { get; init; }
+    public string? QualifiedTeam { get; init; }
+    public required DateTimeOffset SavedAt { get; init; }
+    public required DateTimeOffset SubmittedAt { get; init; }
 }

@@ -1,6 +1,5 @@
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
-using System.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace BolaoCopa2026.Services;
@@ -13,8 +12,14 @@ public static class BolaoSeedData
         var db = scope.ServiceProvider.GetRequiredService<BolaoDbContext>();
 
         Directory.CreateDirectory("Data");
-        db.Database.EnsureCreated();
-        EnsureAuthColumns(db);
+        if (UsesPostgres(db))
+        {
+            db.Database.Migrate();
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+        }
 
         if (db.Rounds.Any())
         {
@@ -24,16 +29,13 @@ public static class BolaoSeedData
 
         db.Rounds.AddRange(SeedRounds());
         db.Matches.AddRange(SeedMatches());
-        db.Participants.AddRange(
-            new Participant { Id = 1, Name = "Ana", Email = "ana@example.com", Login = "ana" },
-            new Participant { Id = 2, Name = "Bruno", Email = "bruno@example.com", Login = "bruno" },
-            new Participant { Id = 3, Name = "Carlos", Email = "carlos@example.com", Login = "carlos" });
-        db.SpecialPredictions.AddRange(
-            new SpecialPrediction { ParticipantId = 1, Champion = "Brasil", RunnerUp = "Franca", TopScorer = "Vinicius Jr.", GoldenBall = "Bellingham" },
-            new SpecialPrediction { ParticipantId = 2, Champion = "Argentina", RunnerUp = "Brasil", TopScorer = "Mbappe", GoldenBall = "Mbappe" },
-            new SpecialPrediction { ParticipantId = 3, Champion = "Franca", RunnerUp = "Espanha", TopScorer = "Kane", GoldenBall = "Vinicius Jr." });
 
         db.SaveChanges();
+    }
+
+    private static bool UsesPostgres(BolaoDbContext db)
+    {
+        return db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static void EnsureMissingMatches(BolaoDbContext db)
@@ -65,44 +67,6 @@ public static class BolaoSeedData
 
         db.Matches.AddRange(missing);
         db.SaveChanges();
-    }
-
-    private static void EnsureAuthColumns(BolaoDbContext db)
-    {
-        TryAddColumn(db, "PasswordHash", "ALTER TABLE Participants ADD COLUMN PasswordHash TEXT NULL");
-        TryAddColumn(db, "IsAdmin", "ALTER TABLE Participants ADD COLUMN IsAdmin INTEGER NOT NULL DEFAULT 0");
-    }
-
-    private static void TryAddColumn(BolaoDbContext db, string columnName, string sql)
-    {
-        if (ParticipantColumnExists(db, columnName))
-        {
-            return;
-        }
-
-        db.Database.ExecuteSqlRaw(sql);
-    }
-
-    private static bool ParticipantColumnExists(BolaoDbContext db, string columnName)
-    {
-        var connection = db.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
-        {
-            connection.Open();
-        }
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info(Participants)";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static List<PredictionRound> SeedRounds()
@@ -205,8 +169,8 @@ public static class BolaoSeedData
             Id = id,
             OfficialNumber = number,
             RoundId = roundId,
-            HomeTeam = home,
-            AwayTeam = away,
+            HomeTeam = CloneTeam(home),
+            AwayTeam = CloneTeam(away),
             GroupName = $"Grupo {groupCode}",
             Venue = venue,
             Phase = CompetitionPhase.GroupStage,
@@ -346,7 +310,13 @@ public static class BolaoSeedData
     private static DateTimeOffset Kickoff(string date, int hour)
     {
         var parsed = DateOnly.Parse(date);
-        return new DateTimeOffset(parsed.Year, parsed.Month, parsed.Day, hour, 0, 0, TimeSpan.FromHours(-3));
+        return new DateTimeOffset(parsed.Year, parsed.Month, parsed.Day, hour, 0, 0, TimeSpan.FromHours(-3))
+            .ToUniversalTime();
+    }
+
+    private static Team CloneTeam(Team team)
+    {
+        return new Team(team.Code, team.Name, team.IsBrazil);
     }
 
     private sealed record GroupSeed(

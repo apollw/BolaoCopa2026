@@ -1,17 +1,21 @@
 using BolaoCopa2026.Models;
 using BolaoCopa2026.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BolaoCopa2026.Pages.Palpites;
 
+[Authorize]
 public class IndexModel : PageModel
 {
+    private readonly AuditImageService _auditImageService;
     private readonly BolaoRepository _repository;
 
-    public IndexModel(BolaoRepository repository)
+    public IndexModel(BolaoRepository repository, AuditImageService auditImageService)
     {
         _repository = repository;
+        _auditImageService = auditImageService;
     }
 
     public IReadOnlyList<PredictionRound> Rounds { get; private set; } = [];
@@ -37,14 +41,19 @@ public class IndexModel : PageModel
         return RedirectToPage(new { roundId });
     }
 
-    public IActionResult OnPostSendAudit(int roundId)
+    public IActionResult OnGetDownloadAudit(int roundId)
     {
-        var participant = _repository.CurrentParticipant;
-        TempData["Status"] = _repository.CanSendPredictionAudit(_repository.CurrentParticipantId, roundId)
-            ? $"Auditoria da rodada enviada para {participant?.Email ?? "o email cadastrado"}."
-            : "Auditoria bloqueada: finalize a rodada antes do envio.";
+        var snapshot = _auditImageService.BuildSnapshot(_repository.CurrentParticipantId, roundId);
+        if (snapshot is null)
+        {
+            TempData["Status"] = "Comprovante bloqueado: finalize a rodada antes de baixar.";
+            return RedirectToPage(new { roundId });
+        }
 
-        return RedirectToPage(new { roundId });
+        var image = _auditImageService.RenderSvg(snapshot);
+        _auditImageService.MarkDownloaded(snapshot);
+        var fileName = $"auditoria-rodada-{roundId}-{snapshot.Participant.Id}.svg";
+        return File(image, "image/svg+xml", fileName);
     }
 
     private void LoadData(int? roundId)
