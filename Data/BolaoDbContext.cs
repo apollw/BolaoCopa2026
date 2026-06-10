@@ -87,6 +87,8 @@ public sealed class BolaoDbContext : DbContext
             entity.Property(prediction => prediction.RunnerUp).HasMaxLength(80);
             entity.Property(prediction => prediction.TopScorer).HasMaxLength(100);
             entity.Property(prediction => prediction.GoldenBall).HasMaxLength(100);
+            entity.Property(prediction => prediction.AuditProofHash).HasMaxLength(128);
+            entity.Ignore(prediction => prediction.IsFinal);
         });
 
         modelBuilder.Entity<ResultAudit>(entity =>

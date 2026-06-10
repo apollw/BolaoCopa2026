@@ -445,6 +445,12 @@ a {
   gap: 6px;
 }
 
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .stacked-form [data-valmsg-for] {
   color: #a33a2b;
   font-size: 0.84rem;

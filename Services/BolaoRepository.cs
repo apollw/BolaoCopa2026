@@ -104,6 +104,98 @@ public sealed class BolaoRepository
         };
     }
 
+    public SpecialPredictionView GetSpecialPrediction(int participantId)
+    {
+        var prediction = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+        var isLocked = IsSpecialPredictionLocked(prediction, out var lockReason);
+
+        return new SpecialPredictionView
+        {
+            Prediction = prediction,
+            IsLocked = isLocked,
+            LockReason = lockReason
+        };
+    }
+
+    public bool SaveSpecialPredictionDraft(
+        int participantId,
+        string champion,
+        string runnerUp,
+        string topScorer,
+        string goldenBall,
+        out string message)
+    {
+        var existing = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+        if (IsSpecialPredictionLocked(existing, out var lockReason))
+        {
+            message = lockReason ?? "Palpites especiais bloqueados.";
+            return false;
+        }
+
+        champion = champion.Trim();
+        runnerUp = runnerUp.Trim();
+        topScorer = topScorer.Trim();
+        goldenBall = goldenBall.Trim();
+
+        if (HasBlankSpecialPrediction(champion, runnerUp, topScorer, goldenBall))
+        {
+            message = "Preencha todos os palpites especiais antes de salvar.";
+            return false;
+        }
+
+        if (existing is null)
+        {
+            _db.SpecialPredictions.Add(new SpecialPrediction
+            {
+                ParticipantId = participantId,
+                Champion = champion,
+                RunnerUp = runnerUp,
+                TopScorer = topScorer,
+                GoldenBall = goldenBall,
+                SavedAt = DateTimeOffset.UtcNow
+            });
+        }
+        else
+        {
+            existing.Champion = champion;
+            existing.RunnerUp = runnerUp;
+            existing.TopScorer = topScorer;
+            existing.GoldenBall = goldenBall;
+            existing.SavedAt = DateTimeOffset.UtcNow;
+        }
+
+        _db.SaveChanges();
+        message = "Palpites especiais salvos como rascunho.";
+        return true;
+    }
+
+    public bool FinalizeSpecialPrediction(int participantId, out string message)
+    {
+        var prediction = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+        if (prediction is null)
+        {
+            message = "Salve seus palpites especiais antes de finalizar.";
+            return false;
+        }
+
+        if (IsSpecialPredictionLocked(prediction, out var lockReason))
+        {
+            message = lockReason ?? "Palpites especiais bloqueados.";
+            return false;
+        }
+
+        if (HasBlankSpecialPrediction(prediction.Champion, prediction.RunnerUp, prediction.TopScorer, prediction.GoldenBall))
+        {
+            message = "Preencha todos os palpites especiais antes de finalizar.";
+            return false;
+        }
+
+        prediction.SubmittedAt = DateTimeOffset.UtcNow;
+        _db.SaveChanges();
+        message = "Palpites especiais finalizados. Agora o comprovante de auditoria pode ser baixado.";
+        return true;
+    }
+
     public bool SaveDraftPrediction(int participantId, int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode, out string message)
     {
         var match = _db.Matches.SingleOrDefault(item => item.Id == matchId);
@@ -204,6 +296,19 @@ public sealed class BolaoRepository
     public bool CanSendPredictionAudit(int participantId, int roundId)
     {
         return GetRoundPrediction(participantId, roundId).CanSendAudit;
+    }
+
+    public void MarkSpecialAuditDownloaded(int participantId, DateTimeOffset generatedAt, string proofHash)
+    {
+        var prediction = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+        if (prediction is null)
+        {
+            return;
+        }
+
+        prediction.AuditDownloadedAt = generatedAt;
+        prediction.AuditProofHash = proofHash;
+        _db.SaveChanges();
     }
 
     public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
@@ -370,6 +475,38 @@ public sealed class BolaoRepository
             .ThenByDescending(entry => entry.GoalsFor)
             .ThenBy(entry => entry.Team.Name)
             .ToList();
+    }
+
+    private bool IsSpecialPredictionLocked(SpecialPrediction? prediction, out string? reason)
+    {
+        reason = null;
+        if (prediction?.IsFinal == true)
+        {
+            reason = "Palpites especiais ja finalizados. O regulamento nao permite editar depois da confirmacao.";
+            return true;
+        }
+
+        var openingKickoff = _db.Matches
+            .ToList()
+            .OrderBy(match => match.Kickoff)
+            .Select(match => match.Kickoff.ToUniversalTime())
+            .FirstOrDefault();
+
+        if (openingKickoff != default && DateTimeOffset.UtcNow >= openingKickoff)
+        {
+            reason = "Palpites especiais ficam bloqueados apos o inicio da Copa.";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasBlankSpecialPrediction(string champion, string runnerUp, string topScorer, string goldenBall)
+    {
+        return string.IsNullOrWhiteSpace(champion)
+            || string.IsNullOrWhiteSpace(runnerUp)
+            || string.IsNullOrWhiteSpace(topScorer)
+            || string.IsNullOrWhiteSpace(goldenBall);
     }
 
     private static void EnsureTeam(Dictionary<string, MutableGroupStanding> entries, Team team)

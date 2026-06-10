@@ -3,6 +3,7 @@ using System;
 using BolaoCopa2026.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BolaoCopa2026.Data.Migrations
 {
     [DbContext(typeof(BolaoDbContext))]
-    partial class BolaoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260610214340_SpecialPredictionAudit")]
+    partial class SpecialPredictionAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

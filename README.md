@@ -10,6 +10,7 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 - Regulamento do bolao com regras de pontuacao e desempate.
 - Cadastro e login por email/senha.
 - Palpites por rodada com salvamento temporario associado ao usuario autenticado.
+- Palpites especiais com rascunho, finalizacao unica e comprovante baixavel.
 - Finalizacao de rodada para travar os palpites.
 - Comprovante de auditoria em imagem bloqueado enquanto a rodada nao estiver finalizada.
 - Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.

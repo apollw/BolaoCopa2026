@@ -70,6 +70,7 @@ Em PostgreSQL/Supabase, `Services/BolaoSeedData.cs` aplica migrations com `Datab
 - `Services/ScoringService.cs`: regra de pontuacao.
 - `Services/AuditImageService.cs`: gera comprovante de auditoria em SVG com metadados e hash.
 - `Pages/Palpites/Index.*`: tela de palpites por rodada.
+- `Pages/Palpites/Especiais.*`: tela de palpites especiais.
 - `Pages/Admin/Login.*`: login separado do organizador/admin.
 - `Pages/Admin/Resultados.*`: registro de resultados reais protegido por policy `AdminOnly`.
 - `Pages/Conta/Cadastro.*`, `Login.*`, `Logout.*`, `Perfil.*`: fluxo simples de conta.
@@ -218,6 +219,19 @@ Regras de bloqueio:
 Essas regras existem tanto na UI quanto no backend:
 
 - `BolaoRepository.IsRoundAvailable(...)`
+
+## Fluxo de Palpites Especiais
+
+Pagina: `/Palpites/Especiais`
+
+O participante pode salvar rascunho de campeao, vice-campeao, artilheiro e Bola de Ouro ate finalizar. Ao finalizar, `SpecialPrediction.SubmittedAt` e preenchido e os campos ficam bloqueados definitivamente. O comprovante SVG fica disponivel apenas depois da finalizacao.
+
+Regras principais:
+
+- rascunho pode ser editado enquanto `SubmittedAt` estiver nulo;
+- finalizacao e unica, sem edicao posterior;
+- especiais tambem bloqueiam apos o inicio da primeira partida da Copa;
+- comprovante grava hash em `SpecialPrediction.AuditProofHash` e horario em `AuditDownloadedAt`.
 - `SaveDraftPrediction(...)`
 - `FinalizeRound(...)`
 
@@ -342,6 +356,7 @@ Implementacao:
 
 - `Services/AuditImageService.cs`
 - `Pages/Palpites/Index.cshtml.cs`, handler `OnGetDownloadAudit`
+- `Pages/Palpites/Especiais.cshtml.cs`, handler `OnGetDownloadAudit`
 
 O SVG inclui:
 

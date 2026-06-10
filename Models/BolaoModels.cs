@@ -82,10 +82,23 @@ public sealed class RoundSubmission
 public sealed class SpecialPrediction
 {
     public int ParticipantId { get; init; }
-    public required string Champion { get; init; }
-    public required string RunnerUp { get; init; }
-    public required string TopScorer { get; init; }
-    public required string GoldenBall { get; init; }
+    public required string Champion { get; set; }
+    public required string RunnerUp { get; set; }
+    public required string TopScorer { get; set; }
+    public required string GoldenBall { get; set; }
+    public DateTimeOffset SavedAt { get; set; }
+    public DateTimeOffset? SubmittedAt { get; set; }
+    public DateTimeOffset? AuditDownloadedAt { get; set; }
+    public string? AuditProofHash { get; set; }
+    public bool IsFinal => SubmittedAt is not null;
+}
+
+public sealed class SpecialPredictionView
+{
+    public SpecialPrediction? Prediction { get; init; }
+    public bool IsLocked { get; init; }
+    public string? LockReason { get; init; }
+    public bool CanDownloadAudit => Prediction?.IsFinal == true;
 }
 
 public sealed class RankingEntry
@@ -176,4 +189,12 @@ public sealed class AuditPredictionLine
     public string? QualifiedTeam { get; init; }
     public required DateTimeOffset SavedAt { get; init; }
     public required DateTimeOffset SubmittedAt { get; init; }
+}
+
+public sealed class SpecialAuditSnapshot
+{
+    public required Participant Participant { get; init; }
+    public required SpecialPrediction Prediction { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string ProofHash { get; init; }
 }
