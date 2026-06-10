@@ -31,6 +31,8 @@ _ReSharper*/
 # Local configuration and secrets
 appsettings.Local.json
 appsettings.*.Local.json
+appsettings.Production.json
+appsettings.Supabase.json
 secrets.json
 *.Development.local.json
 

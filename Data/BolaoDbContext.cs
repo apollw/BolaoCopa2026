@@ -14,6 +14,7 @@ public sealed class BolaoDbContext : DbContext
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<Participant> Participants => Set<Participant>();
     public DbSet<Prediction> Predictions => Set<Prediction>();
+    public DbSet<RoundSubmission> RoundSubmissions => Set<RoundSubmission>();
     public DbSet<SpecialPrediction> SpecialPredictions => Set<SpecialPrediction>();
     public DbSet<ResultAudit> ResultAudits => Set<ResultAudit>();
 
@@ -70,6 +71,13 @@ public sealed class BolaoDbContext : DbContext
             entity.HasIndex(prediction => prediction.MatchId);
             entity.Property(prediction => prediction.QualifiedTeamCode).HasMaxLength(20);
             entity.Ignore(prediction => prediction.IsFinal);
+        });
+
+        modelBuilder.Entity<RoundSubmission>(entity =>
+        {
+            entity.HasKey(submission => submission.Id);
+            entity.HasIndex(submission => new { submission.ParticipantId, submission.RoundId }).IsUnique();
+            entity.Property(submission => submission.AuditProofHash).HasMaxLength(128);
         });
 
         modelBuilder.Entity<SpecialPrediction>(entity =>
