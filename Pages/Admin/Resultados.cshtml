@@ -1,0 +1,69 @@
+﻿@page
+@model BolaoCopa2026.Pages.Admin.ResultadosModel
+@{
+    ViewData["Title"] = "Resultados";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Administracao</p>
+    <h1>Registro Oficial de Resultados</h1>
+</section>
+
+@if (TempData["Status"] is string status)
+{
+    <div class="notice">@status</div>
+}
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Partidas pendentes</h2>
+        <span>confirmacao unica e irreversivel</span>
+    </div>
+
+    <div class="match-list">
+        @foreach (var match in Model.PendingMatches)
+        {
+            <article class="prediction-row">
+                <div>
+                    <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <form method="post" class="score-form" onsubmit="return confirm('Confirmar resultado oficial? Depois de registrado, nao sera possivel editar esta partida.');">
+                    <input type="hidden" name="matchId" value="@match.Id" />
+                    <input type="number" name="homeGoals" min="0" value="0" aria-label="Gols mandante" />
+                    <span>x</span>
+                    <input type="number" name="awayGoals" min="0" value="0" aria-label="Gols visitante" />
+                    @if (match.IsKnockout)
+                    {
+                        <select name="qualifiedTeamCode" aria-label="Classificado">
+                            <option value="">Classificado</option>
+                            <option value="@match.HomeTeam.Code">@match.HomeTeam.Name</option>
+                            <option value="@match.AwayTeam.Code">@match.AwayTeam.Name</option>
+                        </select>
+                    }
+                    <button type="submit" class="btn-app danger">Confirmar</button>
+                </form>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Auditoria</h2>
+        <form method="post" asp-page-handler="SendAudit">
+            <button type="submit" class="btn-app secondary">Enviar auditoria por email</button>
+        </form>
+    </div>
+    <div class="match-list">
+        @foreach (var audit in Model.Audits)
+        {
+            <article class="match-row">
+                <div>
+                    <strong>@audit.Summary</strong>
+                    <span>@audit.RegisteredBy - @audit.RegisteredAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+            </article>
+        }
+    </div>
+</section>

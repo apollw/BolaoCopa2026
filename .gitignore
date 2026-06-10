@@ -1,0 +1,67 @@
+# Build output
+bin/
+obj/
+out/
+publish/
+artifacts/
+
+# .NET local state
+.dotnet/
+.aspnet/
+TestResults/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Local configuration and secrets
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.Development.local.json
+
+# Logs and diagnostics
+logs/
+*.log
+*.trace
+*.etl
+
+# Coverage
+coverage/
+coverage.xml
+coverage.cobertura.xml
+*.coverage
+*.coveragexml
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Node/frontend tooling, in case assets are added later
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo

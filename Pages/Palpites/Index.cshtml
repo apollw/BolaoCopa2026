@@ -1,0 +1,48 @@
+﻿@page
+@model BolaoCopa2026.Pages.Palpites.IndexModel
+@{
+    ViewData["Title"] = "Palpites";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Area do participante</p>
+    <h1>Meus Palpites</h1>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Partidas abertas</h2>
+        <span>bloqueio no horario oficial</span>
+    </div>
+
+    <div class="match-list">
+        @foreach (var match in Model.Matches)
+        {
+            <article class="prediction-row">
+                <div>
+                    <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <form method="post" class="score-form">
+                    <input type="hidden" name="matchId" value="@match.Id" />
+                    <input type="number" name="homeGoals" min="0" value="0" aria-label="Gols mandante" />
+                    <span>x</span>
+                    <input type="number" name="awayGoals" min="0" value="0" aria-label="Gols visitante" />
+                    @if (match.IsKnockout)
+                    {
+                        <select name="qualifiedTeamCode" aria-label="Classificado">
+                            <option value="@match.HomeTeam.Code">@match.HomeTeam.Name</option>
+                            <option value="@match.AwayTeam.Code">@match.AwayTeam.Name</option>
+                        </select>
+                    }
+                    <button type="submit" class="btn-app">Salvar</button>
+                </form>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="panel muted-panel">
+    <h2>Palpites especiais</h2>
+    <p>Campeao, vice, artilheiro e Bola de Ouro ficam disponiveis aqui ate o inicio da Copa.</p>
+</section>

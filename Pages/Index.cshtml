@@ -1,0 +1,112 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Painel";
+    var leader = Model.Stats.Ranking.FirstOrDefault();
+}
+
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Bolao Premier AEW</p>
+        <h1>Copa 2026 sob controle: palpites, ranking e auditoria em um so lugar.</h1>
+        <p class="hero-copy">Acompanhe a disputa entre amigos com regras claras, travas de resultado e estatisticas atualizadas a partir dos placares oficiais.</p>
+    </div>
+    <div class="hero-panel">
+        <span>Lider atual</span>
+        <strong>@(leader?.Participant.Name ?? "Sem ranking")</strong>
+        <small>@(leader?.Points ?? 0) pontos</small>
+    </div>
+</section>
+
+<section class="stats-grid" aria-label="Resumo da Copa">
+    <article>
+        <span>Partidas registradas</span>
+        <strong>@Model.Stats.CompletedCount/@Model.Stats.TotalMatches</strong>
+    </article>
+    <article>
+        <span>Gols computados</span>
+        <strong>@Model.Stats.GoalsScored</strong>
+    </article>
+    <article>
+        <span>Jogos do Brasil finalizados</span>
+        <strong>@Model.Stats.BrazilMatchesCompleted</strong>
+    </article>
+    <article>
+        <span>Palpites especiais</span>
+        <strong>@Model.Stats.SpecialPredictions.Count</strong>
+    </article>
+</section>
+
+<section class="content-grid">
+    <div class="panel">
+        <div class="panel-heading">
+            <h2>Ranking</h2>
+            <span>desempate aplicado</span>
+        </div>
+        <div class="table-wrap">
+            <table class="app-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Participante</th>
+                        <th>Pontos</th>
+                        <th>Exatos</th>
+                        <th>Classif.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var index = 0; index < Model.Stats.Ranking.Count; index++)
+                    {
+                        var entry = Model.Stats.Ranking[index];
+                        <tr>
+                            <td>@(index + 1)</td>
+                            <td>@entry.Participant.Name</td>
+                            <td><strong>@entry.Points</strong></td>
+                            <td>@entry.ExactScores</td>
+                            <td>@entry.KnockoutQualifiedHits</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-heading">
+            <h2>Proximos Jogos</h2>
+            <a asp-page="/Palpites/Index">ver palpites</a>
+        </div>
+        <div class="match-list">
+            @foreach (var match in Model.Stats.UpcomingMatches)
+            {
+                <article class="match-row">
+                    <div>
+                        <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                        <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
+                    </div>
+                    @if (match.IncludesBrazil)
+                    {
+                        <span class="pill">pontuacao dobrada</span>
+                    }
+                </article>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Palpites Especiais</h2>
+        <span>antes do inicio da Copa</span>
+    </div>
+    <div class="special-grid">
+        @foreach (var prediction in Model.Stats.SpecialPredictions)
+        {
+            <article>
+                <span>Participante @prediction.ParticipantId</span>
+                <strong>@prediction.Champion</strong>
+                <small>vice @prediction.RunnerUp | artilheiro @prediction.TopScorer | bola de ouro @prediction.GoldenBall</small>
+            </article>
+        }
+    </div>
+</section>

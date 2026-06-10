@@ -1,0 +1,44 @@
+﻿@page
+@model RegulamentoModel
+@{
+    ViewData["Title"] = "Regulamento";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Regulamento Oficial</p>
+    <h1>Bolao Premier AEW</h1>
+</section>
+
+<section class="rules-grid">
+    <article class="panel">
+        <h2>Pontuacao</h2>
+        <ul class="rule-list">
+            <li><strong>Fase de grupos:</strong> placar exato vale 5 pontos; resultado da partida vale 2 pontos.</li>
+            <li><strong>Jogos do Brasil:</strong> toda pontuacao e dobrada em qualquer fase.</li>
+            <li><strong>Mata-mata:</strong> considera o placar ao fim da prorrogacao, quando houver.</li>
+            <li><strong>Classificado:</strong> acerto do classificado vale mais 2 pontos no mata-mata.</li>
+            <li><strong>Limite:</strong> mata-mata tem maximo de 7 pontos antes da dobra do Brasil.</li>
+        </ul>
+    </article>
+
+    <article class="panel">
+        <h2>Palpites Especiais</h2>
+        <ul class="rule-list">
+            <li>Campeao: 20 pontos.</li>
+            <li>Vice-campeao: 10 pontos.</li>
+            <li>Artilheiro: 10 pontos.</li>
+            <li>Bola de Ouro: 10 pontos.</li>
+        </ul>
+    </article>
+
+    <article class="panel">
+        <h2>Desempate</h2>
+        <ol class="rule-list">
+            <li>Maior numero de placares exatos.</li>
+            <li>Maior numero de classificados acertados no mata-mata.</li>
+            <li>Maior numero de acertos em jogos do Brasil.</li>
+            <li>Maior numero de acertos de resultado.</li>
+            <li>Sorteio.</li>
+        </ol>
+    </article>
+</section>
