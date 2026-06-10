@@ -60,6 +60,14 @@ O `Program.cs` aceita `SUPABASE_DATABASE_URL` ou `DATABASE_URL` no formato URL d
 
 Em PostgreSQL/Supabase, `Services/BolaoSeedData.cs` aplica migrations com `Database.Migrate()` e depois cria apenas dados-base da Copa. Em SQLite local, ainda usa `EnsureCreated()` para desenvolvimento simples.
 
+## Deploy
+
+Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core Razor Pages com servidor Kestrel persistente. O projeto foi preparado para Render com Docker:
+
+- `Dockerfile` publica o app em Release e roda `BolaoCopa2026.dll`;
+- `render.yaml` cria web service free com `Database__Provider=Postgres`;
+- `SUPABASE_DATABASE_URL` deve ser configurada como segredo no painel do Render.
+
 ## Arquivos Principais
 
 - `Program.cs`: registra Razor Pages, EF Core SQLite, autenticacao por cookie, `BolaoRepository`, `ScoringService` e executa o seed.
@@ -76,6 +84,7 @@ Em PostgreSQL/Supabase, `Services/BolaoSeedData.cs` aplica migrations com `Datab
 - `Pages/Conta/Cadastro.*`, `Login.*`, `Logout.*`, `Perfil.*`: fluxo simples de conta.
 - `Pages/Index.*`: dashboard principal.
 - `wwwroot/css/site.css`: estilos principais.
+- `Dockerfile`, `.dockerignore`, `render.yaml`: deploy Docker no Render.
 
 ## Entidades e Conceitos
 

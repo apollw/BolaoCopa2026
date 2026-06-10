@@ -50,6 +50,20 @@ Para aplicar migrations:
 DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
 ```
 
+## Deploy Online Rapido
+
+O projeto esta preparado para deploy Docker no Render usando `Dockerfile` e `render.yaml`.
+
+Passos:
+
+1. Suba este repositorio para o GitHub.
+2. No Render, crie um novo Web Service a partir do repositorio.
+3. Escolha Docker/free instance.
+4. Configure a variavel secreta `SUPABASE_DATABASE_URL` com a URL real do Supabase.
+5. Confirme o deploy.
+
+As demais variaveis ficam em `render.yaml`: `Database__Provider=Postgres` e `ASPNETCORE_URLS=http://0.0.0.0:10000`.
+
 ## Requisitos
 
 - .NET SDK 9.0 ou superior.
