@@ -50,10 +50,8 @@
 
 <section class="panel">
     <div class="panel-heading">
-        <h2>Auditoria</h2>
-        <form method="post" asp-page-handler="SendAudit">
-            <button type="submit" class="btn-app secondary">Enviar auditoria por email</button>
-        </form>
+        <h2>Historico de registros</h2>
+        <span>auditoria dos resultados oficiais cadastrados</span>
     </div>
     <div class="match-list">
         @foreach (var audit in Model.Audits)

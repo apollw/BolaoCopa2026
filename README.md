@@ -2,17 +2,19 @@
 
 Aplicacao web em ASP.NET Core Razor Pages para gerenciar o Bolao Premier AEW da Copa do Mundo 2026 entre amigos.
 
-O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatisticas gerais, cadastro de resultados oficiais e auditoria. A base atual usa dados em memoria com um usuario mockado, servindo como estrutura inicial para evoluir para banco de dados, autenticacao real e envio de email.
+O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatisticas gerais, cadastro de resultados oficiais e auditoria por comprovante baixavel. A base pode usar SQLite local ou PostgreSQL/Supabase, com autenticacao simples por email/senha.
 
 ## Funcionalidades atuais
 
 - Dashboard com ranking, lider atual, estatisticas da Copa e proximos jogos.
 - Regulamento do bolao com regras de pontuacao e desempate.
-- Palpites por rodada com salvamento temporario no perfil do usuario mockado.
+- Cadastro e login por email/senha.
+- Palpites por rodada com salvamento temporario associado ao usuario autenticado.
+- Palpites especiais com rascunho, finalizacao unica e comprovante baixavel.
 - Finalizacao de rodada para travar os palpites.
-- Auditoria por email bloqueada enquanto a rodada nao estiver finalizada.
-- Area administrativa para registrar resultado oficial uma unica vez por partida.
-- Tabela inicial da Copa 2026 com primeira rodada da fase de grupos e cruzamentos oficiais do mata-mata por posicao.
+- Comprovante de auditoria em imagem bloqueado enquanto a rodada nao estiver finalizada.
+- Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.
+- Tabela inicial da Copa 2026 com fase de grupos e cruzamentos do mata-mata por posicao.
 - Interface responsiva para dispositivos moveis.
 
 ## Como rodar
@@ -28,6 +30,39 @@ Depois acesse:
 ```text
 http://localhost:5086
 ```
+
+## Supabase/PostgreSQL
+
+O projeto pode usar SQLite local ou PostgreSQL/Supabase. Por padrao, usa SQLite.
+
+Para Supabase, configure variaveis de ambiente no servidor:
+
+```bash
+Database__Provider=Postgres
+SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
+```
+
+Use `appsettings.Supabase.example.json` apenas como exemplo. Nao commitar senhas reais.
+
+Para aplicar migrations:
+
+```bash
+DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
+```
+
+## Deploy Online Rapido
+
+O projeto esta preparado para deploy Docker no Render usando `Dockerfile` e `render.yaml`.
+
+Passos:
+
+1. Suba este repositorio para o GitHub.
+2. No Render, crie um novo Web Service a partir do repositorio.
+3. Escolha Docker/free instance.
+4. Configure a variavel secreta `SUPABASE_DATABASE_URL` com a URL real do Supabase.
+5. Confirme o deploy.
+
+As demais variaveis ficam em `render.yaml`: `Database__Provider=Postgres` e `ASPNETCORE_URLS=http://0.0.0.0:10000`.
 
 ## Requisitos
 

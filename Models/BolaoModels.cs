@@ -27,8 +27,8 @@ public sealed class Match
     public int Id { get; init; }
     public int OfficialNumber { get; init; }
     public int RoundId { get; init; }
-    public required Team HomeTeam { get; init; }
-    public required Team AwayTeam { get; init; }
+    public required Team HomeTeam { get; set; }
+    public required Team AwayTeam { get; set; }
     public CompetitionPhase Phase { get; init; }
     public DateTimeOffset Kickoff { get; init; }
     public string? GroupName { get; init; }
@@ -49,10 +49,12 @@ public sealed class MatchResult
 
 public sealed class Participant
 {
-    public int Id { get; init; }
-    public required string Name { get; init; }
-    public required string Email { get; init; }
-    public required string Login { get; init; }
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public required string Email { get; set; }
+    public required string Login { get; set; }
+    public string? PasswordHash { get; set; }
+    public bool IsAdmin { get; set; }
 }
 
 public sealed class Prediction
@@ -67,13 +69,36 @@ public sealed class Prediction
     public bool IsFinal => SubmittedAt is not null;
 }
 
+public sealed class RoundSubmission
+{
+    public int Id { get; init; }
+    public int ParticipantId { get; init; }
+    public int RoundId { get; init; }
+    public DateTimeOffset SubmittedAt { get; set; }
+    public DateTimeOffset? AuditDownloadedAt { get; set; }
+    public string? AuditProofHash { get; set; }
+}
+
 public sealed class SpecialPrediction
 {
     public int ParticipantId { get; init; }
-    public required string Champion { get; init; }
-    public required string RunnerUp { get; init; }
-    public required string TopScorer { get; init; }
-    public required string GoldenBall { get; init; }
+    public required string Champion { get; set; }
+    public required string RunnerUp { get; set; }
+    public required string TopScorer { get; set; }
+    public required string GoldenBall { get; set; }
+    public DateTimeOffset SavedAt { get; set; }
+    public DateTimeOffset? SubmittedAt { get; set; }
+    public DateTimeOffset? AuditDownloadedAt { get; set; }
+    public string? AuditProofHash { get; set; }
+    public bool IsFinal => SubmittedAt is not null;
+}
+
+public sealed class SpecialPredictionView
+{
+    public SpecialPrediction? Prediction { get; init; }
+    public bool IsLocked { get; init; }
+    public string? LockReason { get; init; }
+    public bool CanDownloadAudit => Prediction?.IsFinal == true;
 }
 
 public sealed class RankingEntry
@@ -90,6 +115,7 @@ public sealed class DashboardStats
 {
     public required IReadOnlyList<RankingEntry> Ranking { get; init; }
     public required IReadOnlyList<PredictionRound> Rounds { get; init; }
+    public required IReadOnlyList<GroupStanding> GroupStandings { get; init; }
     public required IReadOnlyList<Match> UpcomingMatches { get; init; }
     public required IReadOnlyList<Match> CompletedMatches { get; init; }
     public required IReadOnlyList<SpecialPrediction> SpecialPredictions { get; init; }
@@ -103,13 +129,72 @@ public sealed class RoundPredictionView
 {
     public required PredictionRound Round { get; init; }
     public required IReadOnlyList<MatchPredictionView> Matches { get; init; }
+    public bool IsLocked { get; init; }
     public bool IsFinalized { get; init; }
     public int DraftCount { get; init; }
-    public bool CanSendAudit => IsFinalized;
+    public string? LockReason { get; init; }
+    public bool CanSendAudit => IsFinalized && !IsLocked;
 }
 
 public sealed class MatchPredictionView
 {
     public required Match Match { get; init; }
     public Prediction? Prediction { get; init; }
+}
+
+public sealed class ResultAudit
+{
+    public int Id { get; init; }
+    public int MatchId { get; init; }
+    public required string RegisteredBy { get; init; }
+    public DateTimeOffset RegisteredAt { get; init; }
+    public required string Summary { get; init; }
+}
+
+public sealed class GroupStanding
+{
+    public required string GroupName { get; init; }
+    public required IReadOnlyList<GroupStandingEntry> Entries { get; init; }
+}
+
+public sealed class GroupStandingEntry
+{
+    public required Team Team { get; init; }
+    public int Played { get; init; }
+    public int Wins { get; init; }
+    public int Draws { get; init; }
+    public int Losses { get; init; }
+    public int GoalsFor { get; init; }
+    public int GoalsAgainst { get; init; }
+    public int GoalDifference => GoalsFor - GoalsAgainst;
+    public int Points { get; init; }
+}
+
+public sealed class AuditSnapshot
+{
+    public required Participant Participant { get; init; }
+    public required PredictionRound Round { get; init; }
+    public required IReadOnlyList<AuditPredictionLine> Predictions { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string ProofHash { get; init; }
+}
+
+public sealed class AuditPredictionLine
+{
+    public required int OfficialNumber { get; init; }
+    public required string HomeTeam { get; init; }
+    public required string AwayTeam { get; init; }
+    public required int HomeGoals { get; init; }
+    public required int AwayGoals { get; init; }
+    public string? QualifiedTeam { get; init; }
+    public required DateTimeOffset SavedAt { get; init; }
+    public required DateTimeOffset SubmittedAt { get; init; }
+}
+
+public sealed class SpecialAuditSnapshot
+{
+    public required Participant Participant { get; init; }
+    public required SpecialPrediction Prediction { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string ProofHash { get; init; }
 }

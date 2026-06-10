@@ -1,10 +1,12 @@
 using BolaoCopa2026.Models;
 using BolaoCopa2026.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BolaoCopa2026.Pages.Admin;
 
+[Authorize(Policy = "AdminOnly")]
 public class ResultadosModel : PageModel
 {
     private readonly BolaoRepository _repository;
@@ -24,14 +26,9 @@ public class ResultadosModel : PageModel
 
     public IActionResult OnPost(int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode)
     {
-        _repository.TryRegisterResult(matchId, homeGoals, awayGoals, qualifiedTeamCode, "admin", out var message);
+        var registeredBy = User.Identity?.Name ?? "Administrador";
+        _repository.TryRegisterResult(matchId, homeGoals, awayGoals, qualifiedTeamCode, registeredBy, out var message);
         TempData["Status"] = message;
-        return RedirectToPage();
-    }
-
-    public IActionResult OnPostSendAudit()
-    {
-        TempData["Status"] = "Estrutura pronta: este botao enviara por email a auditoria da rodada preenchida.";
         return RedirectToPage();
     }
 

@@ -1,0 +1,85 @@
+@page
+@model BolaoCopa2026.Pages.Palpites.EspeciaisModel
+@{
+    ViewData["Title"] = "Palpites Especiais";
+    var disabled = Model.SpecialView.IsLocked ? "disabled" : null;
+}
+
+<section class="page-title">
+    <p class="eyebrow">Palpites</p>
+    <h1>Palpites Especiais</h1>
+</section>
+
+@if (TempData["Status"] is string status)
+{
+    <div class="notice">@status</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.SpecialView.LockReason))
+{
+    <div class="notice">@Model.SpecialView.LockReason</div>
+}
+
+<section class="profile-layout">
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Antes da Copa</h2>
+            @if (Model.SpecialView.Prediction?.IsFinal == true)
+            {
+                <span>finalizado e bloqueado</span>
+            }
+            else
+            {
+                <span>rascunho editavel ate finalizar</span>
+            }
+        </div>
+
+        <form method="post" class="stacked-form">
+            <label asp-for="Input.Champion">
+                Campeao
+                <input asp-for="Input.Champion" disabled="@disabled" />
+                <span asp-validation-for="Input.Champion"></span>
+            </label>
+            <label asp-for="Input.RunnerUp">
+                Vice-campeao
+                <input asp-for="Input.RunnerUp" disabled="@disabled" />
+                <span asp-validation-for="Input.RunnerUp"></span>
+            </label>
+            <label asp-for="Input.TopScorer">
+                Artilheiro
+                <input asp-for="Input.TopScorer" disabled="@disabled" />
+                <span asp-validation-for="Input.TopScorer"></span>
+            </label>
+            <label asp-for="Input.GoldenBall">
+                Bola de Ouro
+                <input asp-for="Input.GoldenBall" disabled="@disabled" />
+                <span asp-validation-for="Input.GoldenBall"></span>
+            </label>
+
+            @if (!Model.SpecialView.IsLocked)
+            {
+                <div class="form-actions">
+                    <button class="btn-app" type="submit" asp-page-handler="SaveDraft">Salvar rascunho</button>
+                    <button class="btn-app danger" type="submit" asp-page-handler="Finalize" onclick="return confirm('Finalizar palpites especiais? Depois da confirmacao nao sera possivel editar.');">Finalizar</button>
+                </div>
+            }
+        </form>
+    </article>
+
+    <article class="panel muted-panel">
+        <h2>Auditoria</h2>
+        @if (Model.SpecialView.CanDownloadAudit)
+        {
+            <p>O comprovante registra suas escolhas, horario de finalizacao e hash de verificacao.</p>
+            <a asp-page-handler="DownloadAudit" class="btn-app secondary">Baixar comprovante</a>
+        }
+        else
+        {
+            <p>O comprovante fica disponivel somente depois que os palpites especiais forem finalizados.</p>
+        }
+    </article>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -7,9 +7,8 @@
 
 <section class="page-hero">
     <div>
-        <p class="eyebrow">Bolao Premier AEW</p>
-        <h1>Copa 2026 sob controle: palpites, ranking e auditoria em um so lugar.</h1>
-        <p class="hero-copy">Acompanhe a disputa entre amigos com regras claras, travas de resultado e estatisticas atualizadas a partir dos placares oficiais.</p>
+        <h1 class="eyebrow">Bolao Premier AEW</h1>
+        <p class="hero-copy">Copa 2026 sob controle: palpites, ranking e auditoria em um so lugar.</p>
     </div>
     <div class="hero-panel">
         <span>Lider atual</span>
@@ -91,6 +90,74 @@
                 </article>
             }
         </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Classificacao dos Grupos</h2>
+        <span>calculada pelos resultados reais registrados</span>
+    </div>
+    <div class="groups-grid">
+        @foreach (var group in Model.Stats.GroupStandings)
+        {
+            <article class="group-table">
+                <h3>@group.GroupName</h3>
+                <div class="table-wrap">
+                    <table class="app-table compact-table">
+                        <thead>
+                            <tr>
+                                <th>Selecao</th>
+                                <th>J</th>
+                                <th>Pts</th>
+                                <th>SG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in group.Entries)
+                            {
+                                <tr>
+                                    <td>@entry.Team.Name</td>
+                                    <td>@entry.Played</td>
+                                    <td><strong>@entry.Points</strong></td>
+                                    <td>@entry.GoalDifference</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Resultados Reais</h2>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-page="/Admin/Resultados">registrar resultado</a>
+        }
+    </div>
+    <div class="match-list">
+        @if (Model.Stats.CompletedMatches.Count == 0)
+        {
+            <article class="match-row">
+                <div>
+                    <strong>Nenhum resultado registrado ainda.</strong>
+                    <span>Quando o admin registrar placares oficiais, eles aparecerao aqui.</span>
+                </div>
+            </article>
+        }
+        @foreach (var match in Model.Stats.CompletedMatches.Take(10))
+        {
+            <article class="match-row">
+                <div>
+                    <strong>@match.HomeTeam.Name @match.Result?.HomeGoals x @match.Result?.AwayGoals @match.AwayTeam.Name</strong>
+                    <span>@(match.GroupName ?? match.Phase.ToString()) - jogo @match.OfficialNumber</span>
+                </div>
+            </article>
+        }
     </div>
 </section>
 

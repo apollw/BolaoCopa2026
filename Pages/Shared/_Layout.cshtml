@@ -23,18 +23,51 @@
                         <li class="nav-item">
                             <a class="nav-link" asp-area="" asp-page="/Index">Painel</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Palpites/Index">Palpites</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Admin/Resultados">Resultados</a>
-                        </li>
+                        @if (!User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Palpites/Index">Palpites</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Palpites/Especiais">Especiais</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Admin/Resultados">Resultados</a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link" asp-area="" asp-page="/Regulamento">Regulamento</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Conta/Perfil">Perfil</a>
-                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            @if (!User.IsInRole("Admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="" asp-page="/Conta/Perfil">@User.Identity.Name</a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="" asp-page="/Admin/Resultados">@User.Identity.Name</a>
+                                </li>
+                            }
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Conta/Logout">Sair</a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Conta/Login">Entrar</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Conta/Cadastro">Cadastrar</a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>

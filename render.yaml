@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bolao-copa-2026
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: Database__Provider
+        value: Postgres
+      - key: SUPABASE_DATABASE_URL
+        sync: false
