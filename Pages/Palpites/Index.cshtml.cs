@@ -14,16 +14,40 @@ public class IndexModel : PageModel
         _repository = repository;
     }
 
-    public IReadOnlyList<Match> Matches { get; private set; } = [];
+    public IReadOnlyList<PredictionRound> Rounds { get; private set; } = [];
+    public RoundPredictionView RoundView { get; private set; } = default!;
 
-    public void OnGet()
+    public void OnGet(int? roundId)
     {
-        Matches = _repository.Matches.Where(match => match.Result is null).OrderBy(match => match.Kickoff).ToList();
+        LoadData(roundId);
     }
 
-    public IActionResult OnPost()
+    public IActionResult OnPostSaveDraft(int roundId, int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode)
     {
-        TempData["Status"] = "Estrutura pronta: a persistencia do palpite sera ligada ao usuario autenticado na proxima etapa.";
-        return RedirectToPage();
+        _repository.SaveDraftPrediction(_repository.CurrentParticipantId, matchId, homeGoals, awayGoals, qualifiedTeamCode, out var message);
+        TempData["Status"] = message;
+        return RedirectToPage(new { roundId });
+    }
+
+    public IActionResult OnPostFinalizeRound(int roundId)
+    {
+        _repository.FinalizeRound(_repository.CurrentParticipantId, roundId, out var message);
+        TempData["Status"] = message;
+        return RedirectToPage(new { roundId });
+    }
+
+    public IActionResult OnPostSendAudit(int roundId)
+    {
+        TempData["Status"] = _repository.CanSendPredictionAudit(_repository.CurrentParticipantId, roundId)
+            ? "Auditoria da rodada enviada por email para o participante mockado."
+            : "Auditoria bloqueada: finalize a rodada antes do envio.";
+
+        return RedirectToPage(new { roundId });
+    }
+
+    private void LoadData(int? roundId)
+    {
+        Rounds = _repository.Rounds;
+        RoundView = _repository.GetRoundPrediction(_repository.CurrentParticipantId, roundId);
     }
 }

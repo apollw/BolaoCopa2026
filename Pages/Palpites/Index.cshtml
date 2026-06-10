@@ -9,36 +9,78 @@
     <h1>Meus Palpites</h1>
 </section>
 
+@if (TempData["Status"] is string status)
+{
+    <div class="notice">@status</div>
+}
+
 <section class="panel">
     <div class="panel-heading">
-        <h2>Partidas abertas</h2>
-        <span>bloqueio no horario oficial</span>
+        <div>
+            <h2>@Model.RoundView.Round.Name</h2>
+            <span>@Model.RoundView.Round.StartsOn.ToString("dd/MM") a @Model.RoundView.Round.EndsOn.ToString("dd/MM")</span>
+        </div>
+        <div class="round-status @(Model.RoundView.IsFinalized ? "final" : "draft")">
+            @(Model.RoundView.IsFinalized ? "finalizada" : $"{Model.RoundView.DraftCount} rascunhos")
+        </div>
     </div>
 
-    <div class="match-list">
-        @foreach (var match in Model.Matches)
+    <nav class="round-tabs" aria-label="Rodadas">
+        @foreach (var round in Model.Rounds)
         {
+            <a class="@(round.Id == Model.RoundView.Round.Id ? "active" : null)" asp-page="/Palpites/Index" asp-route-roundId="@round.Id">@round.Name</a>
+        }
+    </nav>
+
+    <div class="match-list">
+        @foreach (var item in Model.RoundView.Matches)
+        {
+            var match = item.Match;
+            var prediction = item.Prediction;
             <article class="prediction-row">
                 <div>
-                    <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
-                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM/yyyy HH:mm")</span>
+                    <strong>@match.OfficialNumber. @match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                    <span>@(match.GroupName ?? match.Phase.ToString()) - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
+                    @if (prediction is not null)
+                    {
+                        <small class="save-state">Salvo no perfil: @prediction.SavedAt.ToLocalTime().ToString("dd/MM HH:mm")</small>
+                    }
                 </div>
-                <form method="post" class="score-form">
+                <form method="post" asp-page-handler="SaveDraft" class="score-form">
+                    <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
                     <input type="hidden" name="matchId" value="@match.Id" />
-                    <input type="number" name="homeGoals" min="0" value="0" aria-label="Gols mandante" />
+                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@Model.RoundView.IsFinalized" />
                     <span>x</span>
-                    <input type="number" name="awayGoals" min="0" value="0" aria-label="Gols visitante" />
+                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@Model.RoundView.IsFinalized" />
                     @if (match.IsKnockout)
                     {
-                        <select name="qualifiedTeamCode" aria-label="Classificado">
-                            <option value="@match.HomeTeam.Code">@match.HomeTeam.Name</option>
-                            <option value="@match.AwayTeam.Code">@match.AwayTeam.Name</option>
+                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@Model.RoundView.IsFinalized">
+                            <option value="">Classificado</option>
+                            <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@match.HomeTeam.Name</option>
+                            <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@match.AwayTeam.Name</option>
                         </select>
                     }
-                    <button type="submit" class="btn-app">Salvar</button>
+                    <button type="submit" class="btn-app" disabled="@Model.RoundView.IsFinalized">Salvar rascunho</button>
                 </form>
             </article>
         }
+    </div>
+</section>
+
+<section class="panel action-panel">
+    <div>
+        <h2>Fechamento da rodada</h2>
+        <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e a auditoria por email permanece bloqueada.</p>
+    </div>
+    <div class="action-buttons">
+        <form method="post" asp-page-handler="FinalizeRound">
+            <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
+            <button type="submit" class="btn-app danger" disabled="@Model.RoundView.IsFinalized">Finalizar rodada</button>
+        </form>
+        <form method="post" asp-page-handler="SendAudit">
+            <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
+            <button type="submit" class="btn-app secondary" disabled="@(!Model.RoundView.CanSendAudit)">Enviar auditoria</button>
+        </form>
     </div>
 </section>
 
