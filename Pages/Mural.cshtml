@@ -1,0 +1,187 @@
+@page
+@model BolaoCopa2026.Pages.MuralModel
+@{
+    ViewData["Title"] = "Mural";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Consulta Publica</p>
+    <h1>Mural de Palpites</h1>
+    <p class="hero-copy mural-copy">Veja os palpites definitivos de cada participante por rodada e acompanhe os especiais em uma tela pensada para navegar sem comprimir tudo de uma vez.</p>
+</section>
+
+<section class="panel mural-toolbar-panel">
+    <div class="panel-heading">
+        <h2>Participantes</h2>
+        <span>@Model.Wall.Participants.Count no mural</span>
+    </div>
+    <div class="mural-filter-row" role="tablist" aria-label="Participantes do mural">
+        <button type="button" class="mural-chip active" data-participant-filter="all">Todos</button>
+        @foreach (var participant in Model.Wall.Participants)
+        {
+            <button type="button" class="mural-chip" data-participant-filter="@participant.Participant.Id">@participant.Participant.Name</button>
+        }
+    </div>
+</section>
+
+<section class="mural-grid">
+    @foreach (var participant in Model.Wall.Participants)
+    {
+        var panels = participant.Rounds
+            .Select(round => $"round-{round.Round.Id}")
+            .ToList();
+
+        if (participant.SpecialPrediction is not null)
+        {
+            panels.Add("special");
+        }
+
+        <article class="panel mural-participant-card" data-participant-card="@participant.Participant.Id">
+            <div class="panel-heading">
+                <div>
+                    <h2>@participant.Participant.Name</h2>
+                    <span>@participant.Participant.Email</span>
+                </div>
+                <div class="mural-participant-stats">
+                    <span>@participant.DefinitivePredictionCount palpites definitivos</span>
+                    <span>@participant.FinalizedRoundCount rodadas fechadas</span>
+                </div>
+            </div>
+
+            <div class="mural-filter-row mural-round-tabs" role="tablist" aria-label="Rodadas de @participant.Participant.Name">
+                @for (var index = 0; index < participant.Rounds.Count; index++)
+                {
+                    var round = participant.Rounds[index];
+                    var isActive = index == 0;
+                    <button type="button"
+                            class="mural-chip @(isActive ? "active" : null)"
+                            data-round-target="@($"participant-{participant.Participant.Id}-round-{round.Round.Id}")">
+                        @round.Round.Name
+                    </button>
+                }
+                @if (participant.SpecialPrediction is not null)
+                {
+                    <button type="button"
+                            class="mural-chip"
+                            data-round-target="@($"participant-{participant.Participant.Id}-special")">
+                        Especiais
+                    </button>
+                }
+            </div>
+
+            <div class="mural-panels">
+                @for (var index = 0; index < participant.Rounds.Count; index++)
+                {
+                    var round = participant.Rounds[index];
+                    var isVisible = index == 0;
+                    <section class="mural-round-panel @(isVisible ? "active" : null)" id="@($"participant-{participant.Participant.Id}-round-{round.Round.Id}")">
+                        <div class="mural-round-meta">
+                            <strong>@round.Round.Name</strong>
+                            <span>
+                                @(round.IsFinalized
+                                    ? $"Rodada finalizada em {round.FinalizedAt?.ToLocalTime().ToString("dd/MM HH:mm")}"
+                                    : "Rodada ainda em andamento")
+                            </span>
+                            <span>@round.DefinitiveCount/@round.TotalMatches palpites definitivos</span>
+                        </div>
+
+                        <div class="mural-match-list">
+                            @foreach (var prediction in round.Predictions)
+                            {
+                                <article class="mural-match-row @(prediction.HasDefinitivePrediction ? "filled" : "pending")">
+                                    <div>
+                                        <strong>Jogo @prediction.OfficialNumber</strong>
+                                        <span>@prediction.HomeTeam x @prediction.AwayTeam</span>
+                                        <small>@prediction.Kickoff.ToLocalTime().ToString("dd/MM HH:mm")</small>
+                                    </div>
+                                    @if (prediction.HasDefinitivePrediction)
+                                    {
+                                        <div class="mural-score">
+                                            <strong>@prediction.HomeGoals x @prediction.AwayGoals</strong>
+                                            <span class="mural-indicator @prediction.OutcomeCssClass">@prediction.OutcomeLabel</span>
+                                            @if (!string.IsNullOrWhiteSpace(prediction.QualifiedTeam))
+                                            {
+                                                <small>classificado: @prediction.QualifiedTeam</small>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mural-score pending">
+                                            <strong>Sem palpite definitivo</strong>
+                                            <small>Aguardando definicao ou rodada em aberto</small>
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
+
+                @if (participant.SpecialPrediction is not null)
+                {
+                    <section class="mural-round-panel" id="@($"participant-{participant.Participant.Id}-special")">
+                        <div class="mural-round-meta">
+                            <strong>Palpites especiais</strong>
+                            <span>Finalizados em @participant.SpecialPrediction.SubmittedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                        </div>
+                        <div class="special-grid mural-special-grid">
+                            <article>
+                                <span>Campeao</span>
+                                <strong>@participant.SpecialPrediction.Champion</strong>
+                            </article>
+                            <article>
+                                <span>Vice-campeao</span>
+                                <strong>@participant.SpecialPrediction.RunnerUp</strong>
+                            </article>
+                            <article>
+                                <span>Artilheiro</span>
+                                <strong>@participant.SpecialPrediction.TopScorer</strong>
+                            </article>
+                            <article>
+                                <span>Bola de Ouro</span>
+                                <strong>@participant.SpecialPrediction.GoldenBall</strong>
+                            </article>
+                        </div>
+                    </section>
+                }
+            </div>
+        </article>
+    }
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const participantChips = document.querySelectorAll('[data-participant-filter]');
+            const participantCards = document.querySelectorAll('[data-participant-card]');
+
+            participantChips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const target = chip.dataset.participantFilter;
+
+                    participantChips.forEach(item => item.classList.toggle('active', item === chip));
+                    participantCards.forEach(card => {
+                        const shouldShow = target === 'all' || card.dataset.participantCard === target;
+                        card.hidden = !shouldShow;
+                    });
+                });
+            });
+
+            document.querySelectorAll('.mural-round-tabs').forEach(tabRow => {
+                const buttons = tabRow.querySelectorAll('[data-round-target]');
+                const card = tabRow.closest('.mural-participant-card');
+                const panels = card.querySelectorAll('.mural-round-panel');
+
+                buttons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const target = button.dataset.roundTarget;
+
+                        buttons.forEach(item => item.classList.toggle('active', item === button));
+                        panels.forEach(panel => panel.classList.toggle('active', panel.id === target));
+                    });
+                });
+            });
+        })();
+    </script>
+}

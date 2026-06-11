@@ -31,8 +31,8 @@
         <strong>@Model.Stats.BrazilMatchesCompleted</strong>
     </article>
     <article>
-        <span>Palpites especiais</span>
-        <strong>@Model.Stats.SpecialPredictions.Count</strong>
+        <span>Participantes</span>
+        <strong>@Model.Stats.Ranking.Count</strong>
     </article>
 </section>
 
@@ -91,6 +91,14 @@
             }
         </div>
     </div>
+</section>
+
+<section class="panel muted-panel">
+    <div class="panel-heading">
+        <h2>Mural de Palpites</h2>
+        <a asp-page="/Mural">abrir mural completo</a>
+    </div>
+    <p>Consulte os palpites definitivos de todos os participantes, inclusive os especiais, em uma tela dedicada por participante e por rodada.</p>
 </section>
 
 <section class="panel">
@@ -161,19 +169,3 @@
     </div>
 </section>
 
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Palpites Especiais</h2>
-        <span>antes do inicio da Copa</span>
-    </div>
-    <div class="special-grid">
-        @foreach (var prediction in Model.Stats.SpecialPredictions)
-        {
-            <article>
-                <span>Participante @prediction.ParticipantId</span>
-                <strong>@prediction.Champion</strong>
-                <small>vice @prediction.RunnerUp | artilheiro @prediction.TopScorer | bola de ouro @prediction.GoldenBall</small>
-            </article>
-        }
-    </div>
-</section>

@@ -49,6 +49,9 @@
                         <li class="nav-item">
                             <a class="nav-link" asp-area="" asp-page="/Regulamento">Regulamento</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-page="/Mural">Mural</a>
+                        </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             @if (!User.IsInRole("Admin"))

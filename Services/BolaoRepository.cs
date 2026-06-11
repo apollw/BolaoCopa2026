@@ -65,11 +65,116 @@ public sealed class BolaoRepository
             GroupStandings = GetGroupStandings(),
             UpcomingMatches = matches.Where(match => match.Result is null).Take(8).ToList(),
             CompletedMatches = completed.OrderByDescending(match => match.Kickoff).ToList(),
-            SpecialPredictions = _db.SpecialPredictions.OrderBy(prediction => prediction.ParticipantId).ToList(),
             TotalMatches = matches.Count,
             CompletedCount = completed.Count,
             BrazilMatchesCompleted = completed.Count(match => match.IncludesBrazil),
             GoalsScored = completed.Sum(match => match.Result!.HomeGoals + match.Result.AwayGoals)
+        };
+    }
+
+    public PublicPredictionsWallView GetPublicPredictionsWall()
+    {
+        AutoFinalizeStartedPredictionsAndRounds();
+
+        var rounds = Rounds;
+        var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
+        var matches = _db.Matches
+            .ToList()
+            .OrderBy(match => match.Kickoff)
+            .ThenBy(match => match.OfficialNumber)
+            .ToList();
+        var matchesByRound = matches
+            .GroupBy(match => match.RoundId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<Match>)group.ToList());
+        var predictions = _db.Predictions.ToList();
+        var predictionsByParticipant = predictions
+            .GroupBy(prediction => prediction.ParticipantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToDictionary(prediction => prediction.MatchId));
+        var submissions = _db.RoundSubmissions.ToList();
+        var submissionsByParticipant = submissions
+            .GroupBy(submission => submission.ParticipantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToDictionary(submission => submission.RoundId));
+        var specialPredictions = _db.SpecialPredictions
+            .Where(prediction => prediction.SubmittedAt != null)
+            .ToDictionary(prediction => prediction.ParticipantId);
+
+        var participantViews = participants
+            .Select(participant =>
+            {
+                var participantPredictions = predictionsByParticipant.GetValueOrDefault(participant.Id) ?? [];
+                var participantSubmissions = submissionsByParticipant.GetValueOrDefault(participant.Id) ?? [];
+
+                var roundViews = rounds
+                    .Select(round =>
+                    {
+                        var roundMatches = matchesByRound.GetValueOrDefault(round.Id) ?? [];
+                        participantSubmissions.TryGetValue(round.Id, out var submission);
+
+                        var lines = roundMatches
+                            .Select(match =>
+                            {
+                                participantPredictions.TryGetValue(match.Id, out var prediction);
+                                var definitivePrediction = prediction?.SubmittedAt is not null ? prediction : null;
+
+                                return new PublicMatchPredictionLine
+                                {
+                                    OfficialNumber = match.OfficialNumber,
+                                    HomeTeam = match.HomeTeam.Name,
+                                    AwayTeam = match.AwayTeam.Name,
+                                    Kickoff = match.Kickoff,
+                                    HomeGoals = definitivePrediction?.HomeGoals,
+                                    AwayGoals = definitivePrediction?.AwayGoals,
+                                    QualifiedTeam = definitivePrediction is null
+                                        ? null
+                                        : ResolveQualifiedTeam(match, definitivePrediction.QualifiedTeamCode),
+                                    SubmittedAt = definitivePrediction?.SubmittedAt,
+                                    Outcome = ResolvePublicPredictionOutcome(match, definitivePrediction)
+                                };
+                            })
+                            .ToList();
+
+                        return new PublicRoundPredictions
+                        {
+                            Round = round,
+                            Predictions = lines,
+                            IsFinalized = submission is not null,
+                            FinalizedAt = submission?.SubmittedAt,
+                            DefinitiveCount = lines.Count(line => line.HasDefinitivePrediction),
+                            TotalMatches = lines.Count
+                        };
+                    })
+                    .ToList();
+
+                specialPredictions.TryGetValue(participant.Id, out var specialPrediction);
+
+                return new PublicParticipantPredictions
+                {
+                    Participant = participant,
+                    Rounds = roundViews,
+                    SpecialPrediction = specialPrediction is null
+                        ? null
+                        : new PublicSpecialPredictionCard
+                        {
+                            Champion = specialPrediction.Champion,
+                            RunnerUp = specialPrediction.RunnerUp,
+                            TopScorer = specialPrediction.TopScorer,
+                            GoldenBall = specialPrediction.GoldenBall,
+                            SubmittedAt = specialPrediction.SubmittedAt!.Value
+                        },
+                    DefinitivePredictionCount = roundViews.Sum(round => round.DefinitiveCount),
+                    FinalizedRoundCount = roundViews.Count(round => round.IsFinalized)
+                };
+            })
+            .ToList();
+
+        return new PublicPredictionsWallView
+        {
+            Participants = participantViews,
+            Rounds = rounds
         };
     }
 
@@ -789,6 +894,44 @@ public sealed class BolaoRepository
     private static bool HasMatchStarted(Match match, DateTimeOffset? now = null)
     {
         return (now ?? DateTimeOffset.UtcNow) >= match.Kickoff.ToUniversalTime();
+    }
+
+    private static string? ResolveQualifiedTeam(Match match, string? qualifiedTeamCode)
+    {
+        return qualifiedTeamCode switch
+        {
+            null or "" => null,
+            _ when qualifiedTeamCode == match.HomeTeam.Code => match.HomeTeam.Name,
+            _ when qualifiedTeamCode == match.AwayTeam.Code => match.AwayTeam.Name,
+            _ => qualifiedTeamCode
+        };
+    }
+
+    private static PublicPredictionOutcome ResolvePublicPredictionOutcome(Match match, Prediction? prediction)
+    {
+        if (prediction?.SubmittedAt is null || match.Result is null)
+        {
+            return PublicPredictionOutcome.PendingOfficialResult;
+        }
+
+        if (prediction.HomeGoals == match.Result.HomeGoals && prediction.AwayGoals == match.Result.AwayGoals)
+        {
+            return PublicPredictionOutcome.ExactScore;
+        }
+
+        return GetOutcome(prediction.HomeGoals, prediction.AwayGoals) == GetOutcome(match.Result.HomeGoals, match.Result.AwayGoals)
+            ? PublicPredictionOutcome.ResultHit
+            : PublicPredictionOutcome.Miss;
+    }
+
+    private static MatchOutcome GetOutcome(int homeGoals, int awayGoals)
+    {
+        if (homeGoals > awayGoals)
+        {
+            return MatchOutcome.HomeWin;
+        }
+
+        return homeGoals == awayGoals ? MatchOutcome.Draw : MatchOutcome.AwayWin;
     }
 
     private static void EnsureTeam(Dictionary<string, MutableGroupStanding> entries, Team team)
