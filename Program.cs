@@ -7,28 +7,17 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<BolaoDbContext>(options =>
 {
-    var provider = builder.Configuration.GetValue<string>("Database:Provider") ?? "Sqlite";
-    if (!builder.Environment.IsDevelopment() && !provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+    options.UseNpgsql(GetPostgresConnectionString(builder.Configuration), postgres =>
     {
-        throw new InvalidOperationException("Ambiente de producao deve usar PostgreSQL/Supabase. Configure Database__Provider=Postgres.");
-    }
-
-    if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
-    {
-        options.UseNpgsql(GetPostgresConnectionString(builder.Configuration), postgres =>
-        {
-            postgres.CommandTimeout(120);
-            postgres.EnableRetryOnFailure();
-        });
-        return;
-    }
-
-    options.UseSqlite(builder.Configuration.GetConnectionString("BolaoDb"));
+        postgres.CommandTimeout(120);
+        postgres.EnableRetryOnFailure();
+    });
 });
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -114,7 +103,7 @@ static string GetPostgresConnectionString(IConfiguration configuration)
 
     if (string.IsNullOrWhiteSpace(configured))
     {
-        throw new InvalidOperationException("Configure ConnectionStrings:BolaoDb or SUPABASE_DATABASE_URL for PostgreSQL.");
+        throw new InvalidOperationException("Configure SUPABASE_DATABASE_URL, DATABASE_URL ou ConnectionStrings:BolaoDb para conectar ao PostgreSQL/Supabase.");
     }
 
     return configured.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)

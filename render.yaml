@@ -9,7 +9,5 @@ services:
         value: Production
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
-      - key: Database__Provider
-        value: Postgres
       - key: SUPABASE_DATABASE_URL
         sync: false

@@ -79,7 +79,7 @@
         <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
     </div>
     <div class="action-buttons">
-        <form method="post" asp-page-handler="FinalizeRound">
+        <form method="post" asp-page-handler="FinalizeRound" onsubmit="return confirm('Finalizar esta rodada? Depois da confirmacao nao sera possivel editar os palpites.');">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
             <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
         </form>

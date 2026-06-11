@@ -9,7 +9,6 @@ namespace BolaoCopa2026.Pages.Admin;
 
 public class LoginModel : PageModel
 {
-    private const string DefaultAdminPassword = "Soyuz123";
     private readonly IConfiguration _configuration;
 
     public LoginModel(IConfiguration configuration)
@@ -39,7 +38,14 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        if (!string.Equals(Input.Password, GetAdminPassword(), StringComparison.Ordinal))
+        var configuredPassword = GetConfiguredAdminPassword();
+        if (string.IsNullOrWhiteSpace(configuredPassword))
+        {
+            StatusMessage = "Senha administrativa nao configurada.";
+            return Page();
+        }
+
+        if (!string.Equals(Input.Password, configuredPassword, StringComparison.Ordinal))
         {
             StatusMessage = "Senha de admin invalida.";
             return Page();
@@ -56,9 +62,9 @@ public class LoginModel : PageModel
         return RedirectToPage("/Admin/Resultados");
     }
 
-    private string GetAdminPassword()
+    private string? GetConfiguredAdminPassword()
     {
-        return _configuration["Admin:Password"] ?? DefaultAdminPassword;
+        return _configuration["Admin:Password"];
     }
 }
 

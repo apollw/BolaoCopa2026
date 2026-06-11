@@ -4,6 +4,7 @@ obj/
 out/
 publish/
 artifacts/
+.artifacts/
 
 # .NET local state
 .dotnet/
@@ -36,7 +37,7 @@ appsettings.Supabase.json
 secrets.json
 *.Development.local.json
 
-# Local database files
+# Local database leftovers
 Data/*.db
 Data/*.db-*
 

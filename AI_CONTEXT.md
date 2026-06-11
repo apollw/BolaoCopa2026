@@ -13,22 +13,16 @@ O sistema permite cadastro simples por email/senha, registro de palpites por rod
 - .NET 9
 - ASP.NET Core Razor Pages
 - EF Core 9
-- SQLite local e suporte preparado para PostgreSQL/Supabase
+- PostgreSQL/Supabase
 - Autenticacao por cookie
 - Bootstrap gerado pelo template + CSS customizado em `wwwroot/css/site.css`
 
 ## Como Rodar
 
-SQLite local:
-
-```bash
-DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
-```
-
 Supabase/PostgreSQL:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
 URL local:
@@ -45,28 +39,11 @@ fuser -k 5086/tcp
 
 ## Banco de Dados
 
-O provider e escolhido por configuracao:
-
-```json
-"Database": {
-  "Provider": "Sqlite"
-}
-```
-
-SQLite local configurado em `appsettings.json`:
-
-```json
-"ConnectionStrings": {
-  "BolaoDb": "Data Source=Data/bolao.db"
-}
-```
-
-O arquivo `Data/bolao.db` e arquivos auxiliares `Data/*.db-*` sao ignorados pelo git.
+O projeto usa exclusivamente PostgreSQL/Supabase.
 
 Para Supabase/PostgreSQL, usar:
 
 ```bash
-Database__Provider=Postgres
 SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
 ```
 
@@ -78,21 +55,21 @@ SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgre
 
 O `Program.cs` aceita `SUPABASE_DATABASE_URL` ou `DATABASE_URL` no formato URL do Supabase e converte internamente para connection string Npgsql. O projeto contem `appsettings.Supabase.example.json` sem segredo real.
 
-Em PostgreSQL/Supabase, `Services/BolaoSeedData.cs` aplica migrations com `Database.Migrate()` e depois cria apenas dados-base da Copa. Em SQLite local, ainda usa `EnsureCreated()` para desenvolvimento simples.
+`Services/BolaoSeedData.cs` aplica migrations com `Database.Migrate()` e depois cria apenas dados-base da Copa.
 
 ## Deploy
 
 Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core Razor Pages com servidor Kestrel persistente. O projeto foi preparado para Render com Docker:
 
 - `Dockerfile` publica o app em Release e roda `BolaoCopa2026.dll`;
-- `render.yaml` cria web service free com `Database__Provider=Postgres`;
+- `render.yaml` cria web service free;
 - `SUPABASE_DATABASE_URL` deve ser configurada como segredo no painel do Render.
-- `Admin__Password` pode ser configurada no painel do Render para sobrescrever a senha padrao do admin.
+- `Admin__Password` deve ser configurada no painel do Render para habilitar o acesso admin.
 - Render gera URL publica `*.onrender.com`; no plano free pode dormir e demorar no primeiro acesso.
 
 ## Arquivos Principais
 
-- `Program.cs`: registra Razor Pages, EF Core SQLite/PostgreSQL, autenticacao por cookie, policies de autorizacao, `BolaoRepository`, `ScoringService` e executa migrations/seed.
+- `Program.cs`: registra Razor Pages, EF Core PostgreSQL/Supabase, autenticacao por cookie, policies de autorizacao, `BolaoRepository`, `ScoringService` e executa migrations/seed.
 - `Data/BolaoDbContext.cs`: mapeamento EF Core das entidades.
 - `Models/BolaoModels.cs`: modelos de dominio e view models.
 - `Services/BolaoRepository.cs`: principal camada de acesso/regras de aplicacao.
@@ -125,13 +102,8 @@ Campos relevantes:
 
 O login de participante usa email/senha e cookie. A area admin exige sessao com role `Admin`, criada em `/Admin/Login` pela senha administrativa.
 
-Senha admin padrao atual no codigo:
-
-```text
-Soyuz123
-```
-
-Pode ser sobrescrita por configuracao/variavel `Admin__Password`.
+A senha admin nao possui mais valor padrao em codigo.
+Ela deve ser configurada por `Admin__Password`.
 
 ### PredictionRound
 
@@ -228,7 +200,7 @@ Implementadas em `Services/ScoringService.cs`.
 Fase de grupos:
 
 - Placar exato: 5 pontos.
-- Resultado da partida: 2 pontos.
+- Resultado da partida: 3 pontos.
 
 Jogos do Brasil:
 
@@ -238,7 +210,7 @@ Mata-mata:
 
 - Considera resultado ao fim da prorrogacao.
 - Placar exato: 5 pontos.
-- Acerto do resultado: 2 pontos.
+- Acerto do resultado: 3 pontos.
 - Acerto do classificado: 2 pontos.
 - Maximo por partida: 7 pontos antes da dobra do Brasil.
 
@@ -450,12 +422,6 @@ Causa: `Pages/Shared/_Layout.cshtml.css` sobrescrevia o `site.css` com `.footer 
 
 Correcao: regra removida e layout principal usa `body` flex column.
 
-### SQLite DateTimeOffset em ORDER BY
-
-SQLite nao ordena `DateTimeOffset` via EF em SQL.
-
-Correcao: consultas que ordenam por `Kickoff` ou `RegisteredAt` carregam com `ToList()` antes do `OrderBy`.
-
 ## Pendencias Importantes
 
 1. Criar tela administrativa/participante para consultar `RoundSubmission`.
@@ -475,19 +441,19 @@ DOTNET_CLI_HOME=.dotnet dotnet build BolaoCopa2026.csproj
 Run:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
 Run com Supabase:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
 Migrations no Supabase:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
 ```
 
 Encerrar app preso na porta 5086:

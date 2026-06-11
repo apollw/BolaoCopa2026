@@ -9,19 +9,11 @@ public sealed class BolaoDbContextFactory : IDesignTimeDbContextFactory<BolaoDbC
     public BolaoDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<BolaoDbContext>();
-        var provider = Environment.GetEnvironmentVariable("Database__Provider") ?? "Postgres";
-
-        if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+        options.UseNpgsql(GetPostgresConnectionString(), postgres =>
         {
-            options.UseNpgsql(GetPostgresConnectionString(), postgres =>
-            {
-                postgres.CommandTimeout(120);
-                postgres.EnableRetryOnFailure();
-            });
-            return new BolaoDbContext(options.Options);
-        }
-
-        options.UseSqlite("Data Source=Data/bolao.db");
+            postgres.CommandTimeout(120);
+            postgres.EnableRetryOnFailure();
+        });
         return new BolaoDbContext(options.Options);
     }
 
@@ -35,7 +27,7 @@ public sealed class BolaoDbContextFactory : IDesignTimeDbContextFactory<BolaoDbC
             return ConvertDatabaseUrl(databaseUrl);
         }
 
-        return "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres;Ssl Mode=Disable";
+        throw new InvalidOperationException("Configure SUPABASE_DATABASE_URL ou DATABASE_URL para usar o BolaoDbContextFactory com PostgreSQL/Supabase.");
     }
 
     private static string ConvertDatabaseUrl(string databaseUrl)
