@@ -1,0 +1,47 @@
+@page
+@model BolaoCopa2026.Pages.Admin.DiagnosticoModel
+@{
+    ViewData["Title"] = "Diagnostico";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Administracao</p>
+    <h1>Diagnostico de Producao</h1>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Banco ativo</h2>
+        <span>sem exibir segredos</span>
+    </div>
+    <div class="stats-grid">
+        <article class="stat-card">
+            <span>Provider EF</span>
+            <strong>@Model.EfProvider</strong>
+        </article>
+        <article class="stat-card">
+            <span>Database:Provider</span>
+            <strong>@Model.ConfiguredProvider</strong>
+        </article>
+        <article class="stat-card">
+            <span>SUPABASE_DATABASE_URL</span>
+            <strong>@(Model.HasSupabaseUrl ? "configurada" : "ausente")</strong>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Contagem de registros</h2>
+        <span>estado atual das tabelas principais</span>
+    </div>
+    <div class="stats-grid">
+        @foreach (var item in Model.Counts)
+        {
+            <article class="stat-card">
+                <span>@item.Name</span>
+                <strong>@item.Count</strong>
+            </article>
+        }
+    </div>
+</section>

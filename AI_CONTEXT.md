@@ -19,14 +19,28 @@ O sistema permite cadastro simples por email/senha, registro de palpites por rod
 
 ## Como Rodar
 
+SQLite local:
+
 ```bash
 DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+```
+
+Supabase/PostgreSQL:
+
+```bash
+DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
 URL local:
 
 ```text
 http://localhost:5086
+```
+
+Encerrar processo local:
+
+```bash
+fuser -k 5086/tcp
 ```
 
 ## Banco de Dados
@@ -53,7 +67,13 @@ Para Supabase/PostgreSQL, usar:
 
 ```bash
 Database__Provider=Postgres
-SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:6543/postgres"
+SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
+```
+
+Usar preferencialmente a porta `5432` do pooler de sessao do Supabase. A porta `6543` apresentou timeout em DDL/migrations durante o setup:
+
+```bash
+SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
 ```
 
 O `Program.cs` aceita `SUPABASE_DATABASE_URL` ou `DATABASE_URL` no formato URL do Supabase e converte internamente para connection string Npgsql. O projeto contem `appsettings.Supabase.example.json` sem segredo real.
@@ -67,10 +87,12 @@ Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core 
 - `Dockerfile` publica o app em Release e roda `BolaoCopa2026.dll`;
 - `render.yaml` cria web service free com `Database__Provider=Postgres`;
 - `SUPABASE_DATABASE_URL` deve ser configurada como segredo no painel do Render.
+- `Admin__Password` pode ser configurada no painel do Render para sobrescrever a senha padrao do admin.
+- Render gera URL publica `*.onrender.com`; no plano free pode dormir e demorar no primeiro acesso.
 
 ## Arquivos Principais
 
-- `Program.cs`: registra Razor Pages, EF Core SQLite, autenticacao por cookie, `BolaoRepository`, `ScoringService` e executa o seed.
+- `Program.cs`: registra Razor Pages, EF Core SQLite/PostgreSQL, autenticacao por cookie, policies de autorizacao, `BolaoRepository`, `ScoringService` e executa migrations/seed.
 - `Data/BolaoDbContext.cs`: mapeamento EF Core das entidades.
 - `Models/BolaoModels.cs`: modelos de dominio e view models.
 - `Services/BolaoRepository.cs`: principal camada de acesso/regras de aplicacao.
@@ -102,6 +124,14 @@ Campos relevantes:
 - `IsAdmin`
 
 O login de participante usa email/senha e cookie. A area admin exige sessao com role `Admin`, criada em `/Admin/Login` pela senha administrativa.
+
+Senha admin padrao atual no codigo:
+
+```text
+Soyuz123
+```
+
+Pode ser sobrescrita por configuracao/variavel `Admin__Password`.
 
 ### PredictionRound
 
@@ -169,6 +199,27 @@ Esse registro e criado em `BolaoRepository.FinalizeRound(...)`. Ele e a fonte pr
 Registro de auditoria de resultado real cadastrado pelo admin.
 
 Nao confundir com o comprovante de auditoria baixado pelo participante.
+
+### SpecialPrediction
+
+Palpites especiais do participante.
+
+Chave:
+
+- `ParticipantId`
+
+Campos:
+
+- `Champion`
+- `RunnerUp`
+- `TopScorer`
+- `GoldenBall`
+- `SavedAt`
+- `SubmittedAt`
+- `AuditDownloadedAt`
+- `AuditProofHash`
+
+Enquanto `SubmittedAt == null`, e rascunho. Quando finalizado, fica bloqueado definitivamente.
 
 ## Regras de Pontuacao
 
@@ -241,8 +292,12 @@ Regras principais:
 - finalizacao e unica, sem edicao posterior;
 - especiais tambem bloqueiam apos o inicio da primeira partida da Copa;
 - comprovante grava hash em `SpecialPrediction.AuditProofHash` e horario em `AuditDownloadedAt`.
-- `SaveDraftPrediction(...)`
-- `FinalizeRound(...)`
+
+Metodos principais:
+
+- `SaveSpecialPredictionDraft(...)`
+- `FinalizeSpecialPrediction(...)`
+- `MarkSpecialAuditDownloaded(...)`
 
 ## Resultados Reais
 
@@ -314,9 +369,9 @@ Limite atual importante:
 
 - 8 rodadas de preenchimento;
 - 72 jogos da fase de grupos;
-- placeholders do mata-mata;
-- participantes demo;
-- palpites especiais demo.
+- placeholders do mata-mata.
+
+Nao cria usuarios, participantes demo nem palpites especiais demo.
 
 Banco existente:
 
@@ -372,11 +427,13 @@ O SVG inclui:
 - participante;
 - email;
 - rodada;
-- data de geracao UTC;
+- data de geracao em horario de Brasilia;
 - lista de palpites finalizados;
 - horario de salvamento;
 - horario de finalizacao;
 - hash SHA-256 do conteudo canonico do comprovante.
+
+O SVG grava metadados com `timezone=America/Sao_Paulo` e `generatedAtBrasilia`. O banco continua usando UTC internamente para compatibilidade correta com PostgreSQL `timestamp with time zone`.
 
 O botao so fica disponivel quando a rodada esta finalizada. Se a rodada ainda estiver em rascunho ou bloqueada, o download nao e gerado.
 
@@ -401,12 +458,11 @@ Correcao: consultas que ordenam por `Kickoff` ou `RegisteredAt` carregam com `To
 
 ## Pendencias Importantes
 
-1. Criar autorizacao real para admin.
-2. Criar tela administrativa/participante para consultar `RoundSubmission`.
-3. Completar horarios/sedes oficiais das rodadas 2 e 3, se necessario.
-4. Implementar criterios oficiais completos de desempate de grupos.
-5. Completar propagacao automatica do mata-mata apos cada fase.
-6. Testar fluxo completo com multiplos usuarios.
+1. Criar tela administrativa/participante para consultar `RoundSubmission`.
+2. Completar horarios/sedes oficiais das rodadas 2 e 3, se necessario.
+3. Implementar criterios oficiais completos de desempate de grupos.
+4. Completar propagacao automatica do mata-mata apos cada fase.
+5. Testar fluxo completo com multiplos usuarios em producao.
 
 ## Comandos Uteis
 
@@ -420,6 +476,18 @@ Run:
 
 ```bash
 DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+```
+
+Run com Supabase:
+
+```bash
+DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+```
+
+Migrations no Supabase:
+
+```bash
+DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
 ```
 
 Encerrar app preso na porta 5086:

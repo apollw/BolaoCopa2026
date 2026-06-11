@@ -13,6 +13,11 @@ builder.Services.AddRazorPages();
 builder.Services.AddDbContext<BolaoDbContext>(options =>
 {
     var provider = builder.Configuration.GetValue<string>("Database:Provider") ?? "Sqlite";
+    if (!builder.Environment.IsDevelopment() && !provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Ambiente de producao deve usar PostgreSQL/Supabase. Configure Database__Provider=Postgres.");
+    }
+
     if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
     {
         options.UseNpgsql(GetPostgresConnectionString(builder.Configuration), postgres =>
