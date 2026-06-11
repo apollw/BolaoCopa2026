@@ -1,13 +1,25 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Encodings.Web;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
+using SkiaSharp;
 
 namespace BolaoCopa2026.Services;
 
 public sealed class AuditImageService
 {
+    private static readonly SKColor PageBackground = SKColor.Parse("#f4f7f2");
+    private static readonly SKColor CardBackground = SKColors.White;
+    private static readonly SKColor CardBorder = SKColor.Parse("#dfe7da");
+    private static readonly SKColor HeaderBackground = SKColor.Parse("#123d32");
+    private static readonly SKColor HeaderAccent = SKColor.Parse("#d5a928");
+    private static readonly SKColor PrimaryText = SKColor.Parse("#182018");
+    private static readonly SKColor SecondaryText = SKColor.Parse("#607166");
+    private static readonly SKColor SubtleFill = SKColor.Parse("#eef3ea");
+    private static readonly SKColor SubtleBorder = SKColor.Parse("#d4dfce");
+    private static readonly SKColor RowFill = SKColor.Parse("#f8faf6");
+    private static readonly SKColor RowBorder = SKColor.Parse("#edf2e9");
+
     private readonly BolaoDbContext _db;
 
     public AuditImageService(BolaoDbContext db)
@@ -30,11 +42,13 @@ public sealed class AuditImageService
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
+        var submission = _db.RoundSubmissions.SingleOrDefault(item =>
+            item.ParticipantId == participantId && item.RoundId == roundId);
         var predictions = _db.Predictions
             .Where(prediction => prediction.ParticipantId == participantId)
             .ToDictionary(prediction => prediction.MatchId);
 
-        if (matches.Count == 0 || matches.Any(match => !predictions.TryGetValue(match.Id, out var prediction) || !prediction.IsFinal))
+        if (matches.Count == 0 || submission is null)
         {
             return null;
         }
@@ -42,17 +56,17 @@ public sealed class AuditImageService
         var lines = matches
             .Select(match =>
             {
-                var prediction = predictions[match.Id];
+                var prediction = predictions.GetValueOrDefault(match.Id);
                 return new AuditPredictionLine
                 {
                     OfficialNumber = match.OfficialNumber,
                     HomeTeam = match.HomeTeam.Name,
                     AwayTeam = match.AwayTeam.Name,
-                    HomeGoals = prediction.HomeGoals,
-                    AwayGoals = prediction.AwayGoals,
-                    QualifiedTeam = ResolveQualifiedTeam(match, prediction.QualifiedTeamCode),
-                    SavedAt = prediction.SavedAt,
-                    SubmittedAt = prediction.SubmittedAt!.Value
+                    HomeGoals = prediction?.IsFinal == true ? prediction.HomeGoals : null,
+                    AwayGoals = prediction?.IsFinal == true ? prediction.AwayGoals : null,
+                    QualifiedTeam = prediction?.IsFinal == true ? ResolveQualifiedTeam(match, prediction.QualifiedTeamCode) : null,
+                    SavedAt = prediction?.IsFinal == true ? prediction.SavedAt : null,
+                    SubmittedAt = prediction?.SubmittedAt
                 };
             })
             .ToList();
@@ -101,87 +115,101 @@ public sealed class AuditImageService
         };
     }
 
-    public byte[] RenderSpecialSvg(SpecialAuditSnapshot snapshot)
+    public byte[] RenderSpecialPng(SpecialAuditSnapshot snapshot)
     {
         var width = 1200;
         var height = 620;
-        var generatedAt = ToBrasilia(snapshot.GeneratedAt);
         var submittedAt = snapshot.Prediction.SubmittedAt is null
             ? "-"
             : FormatBrasilia(snapshot.Prediction.SubmittedAt.Value);
-        var sb = new StringBuilder();
 
-        sb.AppendLine($"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">""");
-        sb.AppendLine("<metadata>");
-        sb.AppendLine(Escape($"participant={snapshot.Participant.Id};email={snapshot.Participant.Email};special=true;generatedAtBrasilia={generatedAt:O};timezone=America/Sao_Paulo;hash={snapshot.ProofHash}"));
-        sb.AppendLine("</metadata>");
-        sb.AppendLine("""<rect width="1200" height="620" fill="#f4f7f2"/>""");
-        sb.AppendLine("""<rect x="32" y="32" width="1136" height="556" rx="8" fill="#ffffff" stroke="#dfe7da"/>""");
-        sb.AppendLine("""<rect x="32" y="32" width="1136" height="142" rx="8" fill="#123d32"/>""");
-        sb.AppendLine(Text(64, 82, "Bolao Premier AEW", 22, "#d5a928", 800));
-        sb.AppendLine(Text(64, 128, "Comprovante de Auditoria de Palpites Especiais", 32, "#ffffff", 850));
-        sb.AppendLine(Text(64, 210, $"Participante: {snapshot.Participant.Name} | Email: {snapshot.Participant.Email}", 20, "#233027", 700));
-        sb.AppendLine(Text(64, 242, $"Finalizado: {submittedAt} | Gerado: {FormatBrasilia(snapshot.GeneratedAt)} | Horario de Brasilia", 18, "#607166", 600));
+        return RenderPng(width, height, canvas =>
+        {
+            DrawCard(canvas, width, height, 142);
 
-        var y = 310;
-        sb.AppendLine(SpecialLine(y, "Campeao", snapshot.Prediction.Champion));
-        sb.AppendLine(SpecialLine(y + 54, "Vice-campeao", snapshot.Prediction.RunnerUp));
-        sb.AppendLine(SpecialLine(y + 108, "Artilheiro", snapshot.Prediction.TopScorer));
-        sb.AppendLine(SpecialLine(y + 162, "Bola de Ouro", snapshot.Prediction.GoldenBall));
+            using var brandPaint = CreateTextPaint(22, HeaderAccent, true);
+            using var titlePaint = CreateTextPaint(32, SKColors.White, true);
+            using var bodyPaint = CreateTextPaint(20, PrimaryText, true);
+            using var metaPaint = CreateTextPaint(18, SecondaryText);
+            using var labelPaint = CreateTextPaint(16, SecondaryText, true);
+            using var valuePaint = CreateTextPaint(20, PrimaryText, true);
+            using var hashLabelPaint = CreateTextPaint(15, SecondaryText, true);
+            using var hashPaint = CreateTextPaint(18, HeaderBackground, true);
 
-        sb.AppendLine("""<rect x="64" y="508" width="1072" height="58" rx="8" fill="#eef3ea" stroke="#d4dfce"/>""");
-        sb.AppendLine(Text(86, 532, "Hash SHA-256 do comprovante", 15, "#607166", 800));
-        sb.AppendLine(Text(86, 558, snapshot.ProofHash, 18, "#123d32", 800));
-        sb.AppendLine("</svg>");
+            canvas.DrawText("Bolao Premier AEW", 64, 82, brandPaint);
+            canvas.DrawText("Comprovante de Auditoria de Palpites Especiais", 64, 128, titlePaint);
+            canvas.DrawText(TruncateText($"Participante: {snapshot.Participant.Name} | Email: {snapshot.Participant.Email}", bodyPaint, 1040), 64, 210, bodyPaint);
+            canvas.DrawText(TruncateText($"Finalizado: {submittedAt} | Gerado: {FormatBrasilia(snapshot.GeneratedAt)} | Horario de Brasilia", metaPaint, 1040), 64, 242, metaPaint);
 
-        return Encoding.UTF8.GetBytes(sb.ToString());
+            DrawSpecialRow(canvas, 310, "Campeao", snapshot.Prediction.Champion, labelPaint, valuePaint);
+            DrawSpecialRow(canvas, 364, "Vice-campeao", snapshot.Prediction.RunnerUp, labelPaint, valuePaint);
+            DrawSpecialRow(canvas, 418, "Artilheiro", snapshot.Prediction.TopScorer, labelPaint, valuePaint);
+            DrawSpecialRow(canvas, 472, "Bola de Ouro", snapshot.Prediction.GoldenBall, labelPaint, valuePaint);
+
+            DrawRoundedBlock(canvas, new SKRect(64, 508, 1136, 566), SubtleFill, SubtleBorder);
+            canvas.DrawText("Hash SHA-256 do comprovante", 86, 532, hashLabelPaint);
+            canvas.DrawText(snapshot.ProofHash, 86, 558, hashPaint);
+        });
     }
 
-    public byte[] RenderSvg(AuditSnapshot snapshot)
+    public byte[] RenderPng(AuditSnapshot snapshot)
     {
         var width = 1200;
         var rowHeight = 42;
         var headerHeight = 250;
         var footerHeight = 120;
         var height = headerHeight + snapshot.Predictions.Count * rowHeight + footerHeight;
-        var sb = new StringBuilder();
-        var generatedAt = ToBrasilia(snapshot.GeneratedAt);
 
-        sb.AppendLine($"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">""");
-        sb.AppendLine("<metadata>");
-        sb.AppendLine(Escape($"participant={snapshot.Participant.Id};email={snapshot.Participant.Email};round={snapshot.Round.Id};generatedAtBrasilia={generatedAt:O};timezone=America/Sao_Paulo;hash={snapshot.ProofHash}"));
-        sb.AppendLine("</metadata>");
-        sb.AppendLine("""<rect width="1200" height="100%" fill="#f4f7f2"/>""");
-        sb.AppendLine("""<rect x="32" y="32" width="1136" height="100%" rx="8" fill="#ffffff" stroke="#dfe7da"/>""");
-        sb.AppendLine("""<rect x="32" y="32" width="1136" height="142" rx="8" fill="#123d32"/>""");
-        sb.AppendLine(Text(64, 82, "Bolao Premier AEW", 22, "#d5a928", 800));
-        sb.AppendLine(Text(64, 128, "Comprovante de Auditoria de Palpites", 34, "#ffffff", 850));
-        sb.AppendLine(Text(64, 204, $"Participante: {snapshot.Participant.Name} | Email: {snapshot.Participant.Email}", 20, "#233027", 700));
-        sb.AppendLine(Text(64, 234, $"Rodada: {snapshot.Round.Name} | Gerado: {FormatBrasilia(snapshot.GeneratedAt)} | Horario de Brasilia", 18, "#607166", 600));
-        sb.AppendLine(Text(64, 270, "Jogo", 16, "#607166", 800));
-        sb.AppendLine(Text(150, 270, "Palpite", 16, "#607166", 800));
-        sb.AppendLine(Text(830, 270, "Salvo", 16, "#607166", 800));
-        sb.AppendLine(Text(1010, 270, "Finalizado", 16, "#607166", 800));
-
-        var y = 306;
-        foreach (var line in snapshot.Predictions)
+        return RenderPng(width, height, canvas =>
         {
-            sb.AppendLine($"""<line x1="64" y1="{y - 24}" x2="1136" y2="{y - 24}" stroke="#edf2e9"/>""");
-            sb.AppendLine(Text(64, y, line.OfficialNumber.ToString(), 16, "#182018", 800));
-            var qualified = string.IsNullOrWhiteSpace(line.QualifiedTeam) ? string.Empty : $" | classificado: {line.QualifiedTeam}";
-            sb.AppendLine(Text(150, y, $"{line.HomeTeam} {line.HomeGoals} x {line.AwayGoals} {line.AwayTeam}{qualified}", 16, "#182018", 700));
-            sb.AppendLine(Text(830, y, ToBrasilia(line.SavedAt).ToString("MM-dd HH:mm"), 15, "#607166", 600));
-            sb.AppendLine(Text(1010, y, ToBrasilia(line.SubmittedAt).ToString("MM-dd HH:mm"), 15, "#607166", 600));
-            y += rowHeight;
-        }
+            DrawCard(canvas, width, height, 142);
 
-        var footerY = y + 20;
-        sb.AppendLine($"""<rect x="64" y="{footerY}" width="1072" height="68" rx="8" fill="#eef3ea" stroke="#d4dfce"/>""");
-        sb.AppendLine(Text(86, footerY + 28, "Hash SHA-256 do comprovante", 16, "#607166", 800));
-        sb.AppendLine(Text(86, footerY + 54, snapshot.ProofHash, 18, "#123d32", 800));
-        sb.AppendLine("</svg>");
+            using var brandPaint = CreateTextPaint(22, HeaderAccent, true);
+            using var titlePaint = CreateTextPaint(34, SKColors.White, true);
+            using var bodyPaint = CreateTextPaint(20, PrimaryText, true);
+            using var metaPaint = CreateTextPaint(18, SecondaryText);
+            using var tableHeaderPaint = CreateTextPaint(16, SecondaryText, true);
+            using var numberPaint = CreateTextPaint(16, PrimaryText, true);
+            using var predictionPaint = CreateTextPaint(16, PrimaryText, true);
+            using var datePaint = CreateTextPaint(15, SecondaryText);
+            using var hashLabelPaint = CreateTextPaint(16, SecondaryText, true);
+            using var hashPaint = CreateTextPaint(18, HeaderBackground, true);
+            using var dividerPaint = new SKPaint
+            {
+                IsAntialias = true,
+                Color = RowBorder,
+                StrokeWidth = 1
+            };
 
-        return Encoding.UTF8.GetBytes(sb.ToString());
+            canvas.DrawText("Bolao Premier AEW", 64, 82, brandPaint);
+            canvas.DrawText("Comprovante de Auditoria de Palpites", 64, 128, titlePaint);
+            canvas.DrawText(TruncateText($"Participante: {snapshot.Participant.Name} | Email: {snapshot.Participant.Email}", bodyPaint, 1040), 64, 204, bodyPaint);
+            canvas.DrawText(TruncateText($"Rodada: {snapshot.Round.Name} | Gerado: {FormatBrasilia(snapshot.GeneratedAt)} | Horario de Brasilia", metaPaint, 1040), 64, 234, metaPaint);
+            canvas.DrawText("Jogo", 64, 270, tableHeaderPaint);
+            canvas.DrawText("Palpite", 150, 270, tableHeaderPaint);
+            canvas.DrawText("Salvo", 830, 270, tableHeaderPaint);
+            canvas.DrawText("Finalizado", 1010, 270, tableHeaderPaint);
+
+            var y = 306f;
+            foreach (var line in snapshot.Predictions)
+            {
+                canvas.DrawLine(64, y - 24, 1136, y - 24, dividerPaint);
+                canvas.DrawText(line.OfficialNumber.ToString(), 64, y, numberPaint);
+                var qualified = string.IsNullOrWhiteSpace(line.QualifiedTeam) ? string.Empty : $" | classificado: {line.QualifiedTeam}";
+                var prediction = line.HasPrediction
+                    ? $"{line.HomeTeam} {line.HomeGoals} x {line.AwayGoals} {line.AwayTeam}{qualified}"
+                    : $"{line.HomeTeam} x {line.AwayTeam} | sem palpite";
+                canvas.DrawText(TruncateText(prediction, predictionPaint, 650), 150, y, predictionPaint);
+                canvas.DrawText(line.SavedAt is null ? "-" : ToBrasilia(line.SavedAt.Value).ToString("MM-dd HH:mm"), 830, y, datePaint);
+                canvas.DrawText(line.SubmittedAt is null ? "-" : ToBrasilia(line.SubmittedAt.Value).ToString("MM-dd HH:mm"), 1010, y, datePaint);
+                y += rowHeight;
+            }
+
+            var footerY = y + 20;
+            DrawRoundedBlock(canvas, new SKRect(64, footerY, 1136, footerY + 68), SubtleFill, SubtleBorder);
+            canvas.DrawText("Hash SHA-256 do comprovante", 86, footerY + 28, hashLabelPaint);
+            canvas.DrawText(snapshot.ProofHash, 86, footerY + 54, hashPaint);
+        });
     }
 
     private static string BuildHash(Participant participant, PredictionRound round, IReadOnlyList<AuditPredictionLine> lines)
@@ -191,7 +219,7 @@ public sealed class AuditImageService
         canonical.AppendLine($"round:{round.Id}|{round.Name}");
         foreach (var line in lines.OrderBy(item => item.OfficialNumber))
         {
-            canonical.AppendLine($"{line.OfficialNumber}|{line.HomeTeam}|{line.AwayTeam}|{line.HomeGoals}|{line.AwayGoals}|{line.QualifiedTeam}|{line.SavedAt:O}|{line.SubmittedAt:O}");
+            canonical.AppendLine($"{line.OfficialNumber}|{line.HomeTeam}|{line.AwayTeam}|{line.HomeGoals?.ToString() ?? "-"}|{line.AwayGoals?.ToString() ?? "-"}|{line.QualifiedTeam ?? "-"}|{line.SavedAt?.ToString("O") ?? "-"}|{line.SubmittedAt?.ToString("O") ?? "-"}");
         }
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()));
@@ -220,9 +248,93 @@ public sealed class AuditImageService
         };
     }
 
-    private static string Text(int x, int y, string value, int size, string color, int weight)
+    private static byte[] RenderPng(int width, int height, Action<SKCanvas> draw)
     {
-        return $"""<text x="{x}" y="{y}" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="{size}" font-weight="{weight}" fill="{color}">{Escape(value)}</text>""";
+        var imageInfo = new SKImageInfo(width, height);
+        using var surface = SKSurface.Create(imageInfo);
+        var canvas = surface.Canvas;
+        canvas.Clear(PageBackground);
+        draw(canvas);
+        canvas.Flush();
+
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    private static void DrawCard(SKCanvas canvas, int width, int height, float headerHeight)
+    {
+        DrawRoundedBlock(canvas, new SKRect(32, 32, width - 32, height - 32), CardBackground, CardBorder);
+
+        using var headerPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Color = HeaderBackground
+        };
+
+        canvas.DrawRoundRect(new SKRoundRect(new SKRect(32, 32, width - 32, 32 + headerHeight), 8, 8), headerPaint);
+    }
+
+    private static void DrawRoundedBlock(SKCanvas canvas, SKRect rect, SKColor fill, SKColor border)
+    {
+        using var fillPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Color = fill
+        };
+        using var borderPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1,
+            Color = border
+        };
+
+        var roundedRect = new SKRoundRect(rect, 8, 8);
+        canvas.DrawRoundRect(roundedRect, fillPaint);
+        canvas.DrawRoundRect(roundedRect, borderPaint);
+    }
+
+    private static void DrawSpecialRow(SKCanvas canvas, float baselineY, string label, string value, SKPaint labelPaint, SKPaint valuePaint)
+    {
+        DrawRoundedBlock(canvas, new SKRect(64, baselineY - 32, 1136, baselineY + 12), RowFill, RowBorder);
+        canvas.DrawText(label, 88, baselineY - 4, labelPaint);
+        canvas.DrawText(TruncateText(value, valuePaint, 810), 300, baselineY - 4, valuePaint);
+    }
+
+    private static SKPaint CreateTextPaint(float size, SKColor color, bool bold = false)
+    {
+        return new SKPaint
+        {
+            IsAntialias = true,
+            SubpixelText = true,
+            FakeBoldText = bold,
+            Typeface = SKTypeface.Default,
+            TextSize = size,
+            Color = color
+        };
+    }
+
+    private static string TruncateText(string value, SKPaint paint, float maxWidth)
+    {
+        if (paint.MeasureText(value) <= maxWidth)
+        {
+            return value;
+        }
+
+        const string ellipsis = "...";
+        for (var length = value.Length - 1; length > 0; length--)
+        {
+            var candidate = value[..length] + ellipsis;
+            if (paint.MeasureText(candidate) <= maxWidth)
+            {
+                return candidate;
+            }
+        }
+
+        return ellipsis;
     }
 
     private static DateTimeOffset ToBrasilia(DateTimeOffset value)
@@ -234,19 +346,5 @@ public sealed class AuditImageService
     private static string FormatBrasilia(DateTimeOffset value)
     {
         return ToBrasilia(value).ToString("yyyy-MM-dd HH:mm:ss");
-    }
-
-    private static string SpecialLine(int y, string label, string value)
-    {
-        return $"""
-            <rect x="64" y="{y - 32}" width="1072" height="44" rx="8" fill="#f8faf6" stroke="#edf2e9"/>
-            {Text(88, y - 4, label, 16, "#607166", 800)}
-            {Text(300, y - 4, value, 20, "#182018", 800)}
-            """;
-    }
-
-    private static string Escape(string value)
-    {
-        return HtmlEncoder.Default.Encode(value);
     }
 }

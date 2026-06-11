@@ -74,6 +74,8 @@ public sealed class BolaoRepository
         var rounds = Rounds;
         var selectedRound = rounds.SingleOrDefault(round => round.Id == roundId) ?? rounds.First();
         var isLocked = !IsRoundAvailable(participantId, selectedRound.Id, out var lockReason);
+        var isFinalized = IsRoundFinalized(participantId, selectedRound.Id);
+        var now = DateTimeOffset.UtcNow;
         var roundMatches = _db.Matches
             .Where(match => match.RoundId == selectedRound.Id)
             .ToList()
@@ -86,10 +88,16 @@ public sealed class BolaoRepository
             .ToDictionary(prediction => prediction.MatchId);
 
         var matches = roundMatches
-            .Select(match => new MatchPredictionView
+            .Select(match =>
             {
-                Match = match,
-                Prediction = participantPredictions.GetValueOrDefault(match.Id)
+                var hasStarted = HasMatchStarted(match, now);
+                return new MatchPredictionView
+                {
+                    Match = match,
+                    Prediction = participantPredictions.GetValueOrDefault(match.Id),
+                    HasStarted = hasStarted,
+                    CanEdit = !isLocked && !isFinalized && !hasStarted
+                };
             })
             .ToList();
 
@@ -99,8 +107,12 @@ public sealed class BolaoRepository
             Matches = matches,
             IsLocked = isLocked,
             LockReason = lockReason,
-            IsFinalized = IsRoundFinalized(participantId, selectedRound.Id),
-            DraftCount = matches.Count(item => item.Prediction is { IsFinal: false })
+            IsFinalized = isFinalized,
+            DraftCount = matches.Count(item => item.Prediction is { IsFinal: false }),
+            MissingCount = matches.Count(item => item.Prediction is null),
+            StartedMatchCount = matches.Count(item => item.HasStarted),
+            StartedWithoutPredictionCount = matches.Count(item => item.HasStarted && item.Prediction is null),
+            OpenWithoutPredictionCount = matches.Count(item => !item.HasStarted && item.Prediction is null)
         };
     }
 
@@ -211,7 +223,13 @@ public sealed class BolaoRepository
             return false;
         }
 
-        if (DateTimeOffset.UtcNow >= match.Kickoff.ToUniversalTime())
+        if (IsRoundFinalized(participantId, match.RoundId))
+        {
+            message = "Esta rodada ja foi finalizada. Nao e mais possivel adicionar ou editar palpites.";
+            return false;
+        }
+
+        if (HasMatchStarted(match))
         {
             message = "O horario oficial da partida ja iniciou. O palpite nao pode mais ser alterado.";
             return false;
@@ -257,6 +275,12 @@ public sealed class BolaoRepository
             return false;
         }
 
+        if (IsRoundFinalized(participantId, roundId))
+        {
+            message = "Esta rodada ja foi finalizada. Nao e mais possivel adicionar ou editar palpites.";
+            return false;
+        }
+
         var roundMatchIds = _db.Matches
             .Where(match => match.RoundId == roundId)
             .Select(match => match.Id)
@@ -265,31 +289,25 @@ public sealed class BolaoRepository
         var predictions = _db.Predictions
             .Where(prediction => prediction.ParticipantId == participantId && roundMatchIds.Contains(prediction.MatchId))
             .ToList();
-
-        if (predictions.Count != roundMatchIds.Count)
-        {
-            message = "Preencha todos os jogos da rodada antes de finalizar.";
-            return false;
-        }
+        var finalizedAt = DateTimeOffset.UtcNow;
 
         foreach (var prediction in predictions.Where(prediction => !prediction.IsFinal))
         {
-            prediction.SubmittedAt = DateTimeOffset.UtcNow;
+            prediction.SubmittedAt = finalizedAt;
         }
 
-        var submission = _db.RoundSubmissions.SingleOrDefault(item => item.ParticipantId == participantId && item.RoundId == roundId);
-        if (submission is null)
+        _db.RoundSubmissions.Add(new RoundSubmission
         {
-            _db.RoundSubmissions.Add(new RoundSubmission
-            {
-                ParticipantId = participantId,
-                RoundId = roundId,
-                SubmittedAt = DateTimeOffset.UtcNow
-            });
-        }
+            ParticipantId = participantId,
+            RoundId = roundId,
+            SubmittedAt = finalizedAt
+        });
 
         _db.SaveChanges();
-        message = "Rodada finalizada. Agora o comprovante de auditoria pode ser baixado.";
+        var missingCount = roundMatchIds.Count - predictions.Select(prediction => prediction.MatchId).Distinct().Count();
+        message = missingCount > 0
+            ? $"Rodada finalizada com {missingCount} partida(s) sem palpite. Elas ficaram em branco e nao poderao mais ser preenchidas ou editadas. Agora o comprovante de auditoria pode ser baixado."
+            : "Rodada finalizada. Nao e mais possivel adicionar ou editar palpites. Agora o comprovante de auditoria pode ser baixado.";
         return true;
     }
 
@@ -507,6 +525,11 @@ public sealed class BolaoRepository
             || string.IsNullOrWhiteSpace(runnerUp)
             || string.IsNullOrWhiteSpace(topScorer)
             || string.IsNullOrWhiteSpace(goldenBall);
+    }
+
+    private static bool HasMatchStarted(Match match, DateTimeOffset? now = null)
+    {
+        return (now ?? DateTimeOffset.UtcNow) >= match.Kickoff.ToUniversalTime();
     }
 
     private static void EnsureTeam(Dictionary<string, MutableGroupStanding> entries, Team team)

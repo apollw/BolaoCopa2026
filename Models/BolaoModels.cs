@@ -132,6 +132,10 @@ public sealed class RoundPredictionView
     public bool IsLocked { get; init; }
     public bool IsFinalized { get; init; }
     public int DraftCount { get; init; }
+    public int MissingCount { get; init; }
+    public int StartedMatchCount { get; init; }
+    public int StartedWithoutPredictionCount { get; init; }
+    public int OpenWithoutPredictionCount { get; init; }
     public string? LockReason { get; init; }
     public bool CanSendAudit => IsFinalized && !IsLocked;
 }
@@ -140,6 +144,8 @@ public sealed class MatchPredictionView
 {
     public required Match Match { get; init; }
     public Prediction? Prediction { get; init; }
+    public bool HasStarted { get; init; }
+    public bool CanEdit { get; init; }
 }
 
 public sealed class ResultAudit
@@ -184,11 +190,12 @@ public sealed class AuditPredictionLine
     public required int OfficialNumber { get; init; }
     public required string HomeTeam { get; init; }
     public required string AwayTeam { get; init; }
-    public required int HomeGoals { get; init; }
-    public required int AwayGoals { get; init; }
+    public int? HomeGoals { get; init; }
+    public int? AwayGoals { get; init; }
     public string? QualifiedTeam { get; init; }
-    public required DateTimeOffset SavedAt { get; init; }
-    public required DateTimeOffset SubmittedAt { get; init; }
+    public DateTimeOffset? SavedAt { get; init; }
+    public DateTimeOffset? SubmittedAt { get; init; }
+    public bool HasPrediction => HomeGoals is not null && AwayGoals is not null;
 }
 
 public sealed class SpecialAuditSnapshot

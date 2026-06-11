@@ -2,6 +2,9 @@
 @model BolaoCopa2026.Pages.Palpites.IndexModel
 @{
     ViewData["Title"] = "Palpites";
+    var confirmMessage = Model.RoundView.MissingCount > 0
+        ? $"Finalizar esta rodada? Voce tem {Model.RoundView.MissingCount} partida(s) sem palpite, que ficarao em branco. Depois da confirmacao nao sera possivel adicionar nem editar palpites."
+        : "Finalizar esta rodada? Depois da confirmacao nao sera possivel adicionar nem editar palpites.";
 }
 
 <section class="page-title">
@@ -37,6 +40,15 @@
     {
         <div class="notice">@Model.RoundView.LockReason</div>
     }
+    else if (!Model.RoundView.IsFinalized && Model.RoundView.MissingCount > 0)
+    {
+        <div class="notice">Voce ainda tem @Model.RoundView.MissingCount partida(s) sem palpite. Se finalizar agora, elas ficarao em branco e nao poderao mais ser preenchidas.</div>
+    }
+
+    @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
+    {
+        <div class="notice">@Model.RoundView.StartedWithoutPredictionCount partida(s) desta rodada ja comecaram sem palpite salvo. Esses jogos permanecerao sem palpite.</div>
+    }
 
     <div class="match-list">
         @foreach (var item in Model.RoundView.Matches)
@@ -51,22 +63,30 @@
                     {
                         <small class="save-state">Salvo no perfil: @prediction.SavedAt.ToLocalTime().ToString("dd/MM HH:mm")</small>
                     }
+                    else
+                    {
+                        <small class="save-state">Nenhum palpite salvo para este jogo.</small>
+                    }
+                    @if (!Model.RoundView.IsFinalized && item.HasStarted)
+                    {
+                        <small class="save-state">Partida iniciada. Este jogo nao aceita mais edicao.</small>
+                    }
                 </div>
                 <form method="post" asp-page-handler="SaveDraft" class="score-form">
                     <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
                     <input type="hidden" name="matchId" value="@match.Id" />
-                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
+                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@(!item.CanEdit)" />
                     <span>x</span>
-                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
+                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@(!item.CanEdit)" />
                     @if (match.IsKnockout)
                     {
-                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">
+                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@(!item.CanEdit)">
                             <option value="">Classificado</option>
                             <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@match.HomeTeam.Name</option>
                             <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@match.AwayTeam.Name</option>
                         </select>
                     }
-                    <button type="submit" class="btn-app" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Salvar rascunho</button>
+                    <button type="submit" class="btn-app" disabled="@(!item.CanEdit)">Salvar rascunho</button>
                 </form>
             </article>
         }
@@ -77,9 +97,10 @@
     <div>
         <h2>Fechamento da rodada</h2>
         <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
+        <p>Voce pode finalizar a rodada mesmo com partidas sem palpite. Os jogos em branco permanecerao sem palpite, e depois da finalizacao nao sera mais possivel adicionar nem editar palpites.</p>
     </div>
     <div class="action-buttons">
-        <form method="post" asp-page-handler="FinalizeRound" onsubmit="return confirm('Finalizar esta rodada? Depois da confirmacao nao sera possivel editar os palpites.');">
+        <form method="post" asp-page-handler="FinalizeRound" onsubmit="return confirm('@confirmMessage');">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
             <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
         </form>

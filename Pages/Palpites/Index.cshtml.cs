@@ -50,10 +50,10 @@ public class IndexModel : PageModel
             return RedirectToPage(new { roundId });
         }
 
-        var image = _auditImageService.RenderSvg(snapshot);
+        var image = _auditImageService.RenderPng(snapshot);
         _auditImageService.MarkDownloaded(snapshot);
-        var fileName = $"auditoria-rodada-{roundId}-{snapshot.Participant.Id}.svg";
-        return File(image, "image/svg+xml", fileName);
+        var fileName = $"auditoria-rodada-{roundId}-{snapshot.Participant.Id}.png";
+        return File(image, "image/png", fileName);
     }
 
     private void LoadData(int? roundId)
