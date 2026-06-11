@@ -148,6 +148,14 @@ public sealed class MatchPredictionView
     public bool CanEdit { get; init; }
 }
 
+public sealed class RoundDraftUpdate
+{
+    public int MatchId { get; init; }
+    public int? HomeGoals { get; init; }
+    public int? AwayGoals { get; init; }
+    public string? QualifiedTeamCode { get; init; }
+}
+
 public sealed class ResultAudit
 {
     public int Id { get; init; }

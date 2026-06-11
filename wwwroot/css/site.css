@@ -13,6 +13,10 @@ body {
   min-height: 100%;
 }
 
+body.global-loading-active {
+  overflow: hidden;
+}
+
 a {
   color: #176b52;
 }
@@ -464,6 +468,74 @@ a {
   height: 56px;
   line-height: 56px;
   width: 100%;
+}
+
+.global-loading-overlay {
+  align-items: center;
+  background: rgba(12, 31, 24, 0.42);
+  backdrop-filter: blur(4px);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  opacity: 0;
+  padding: 24px;
+  pointer-events: none;
+  position: fixed;
+  right: 0;
+  top: 0;
+  transition: opacity 0.18s ease;
+  z-index: 2000;
+}
+
+.global-loading-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.global-loading-card {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dfe7da;
+  border-radius: 10px;
+  box-shadow: 0 24px 54px rgba(17, 34, 24, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  padding: 24px 28px;
+  text-align: center;
+  width: 100%;
+}
+
+.global-loading-card strong {
+  color: #123d32;
+  font-size: 1.1rem;
+  font-weight: 850;
+}
+
+.global-loading-card span {
+  color: #607166;
+  font-size: 0.92rem;
+}
+
+.global-loading-spinner {
+  animation: global-loading-spin 0.9s linear infinite;
+  border: 4px solid #dfe7da;
+  border-radius: 999px;
+  border-top-color: #176b52;
+  height: 42px;
+  width: 42px;
+}
+
+@keyframes global-loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 900px) {

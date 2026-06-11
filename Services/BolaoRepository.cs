@@ -10,6 +10,8 @@ public sealed class BolaoRepository
     private readonly BolaoDbContext _db;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ScoringService _scoringService;
+    private bool _autoFinalizeSynchronized;
+    private bool _autoFinalizeRunning;
 
     public BolaoRepository(BolaoDbContext db, IHttpContextAccessor httpContextAccessor, ScoringService scoringService)
     {
@@ -47,6 +49,8 @@ public sealed class BolaoRepository
 
     public DashboardStats GetDashboard()
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         var matches = _db.Matches
             .ToList()
             .OrderBy(match => match.Kickoff)
@@ -71,6 +75,8 @@ public sealed class BolaoRepository
 
     public RoundPredictionView GetRoundPrediction(int participantId, int? roundId)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         var rounds = Rounds;
         var selectedRound = rounds.SingleOrDefault(round => round.Id == roundId) ?? rounds.First();
         var isLocked = !IsRoundAvailable(participantId, selectedRound.Id, out var lockReason);
@@ -210,6 +216,8 @@ public sealed class BolaoRepository
 
     public bool SaveDraftPrediction(int participantId, int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode, out string message)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         var match = _db.Matches.SingleOrDefault(item => item.Id == matchId);
         if (match is null)
         {
@@ -267,8 +275,114 @@ public sealed class BolaoRepository
         return true;
     }
 
+    public bool SaveRoundDrafts(int participantId, int roundId, IReadOnlyList<RoundDraftUpdate> drafts, out string message)
+    {
+        AutoFinalizeStartedPredictionsAndRounds();
+
+        if (!IsRoundAvailable(participantId, roundId, out var lockReason))
+        {
+            message = lockReason ?? "Esta rodada ainda esta bloqueada.";
+            return false;
+        }
+
+        if (IsRoundFinalized(participantId, roundId))
+        {
+            message = "Esta rodada ja foi finalizada. Nao e mais possivel adicionar ou editar palpites.";
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var roundMatches = _db.Matches
+            .Where(match => match.RoundId == roundId)
+            .ToDictionary(match => match.Id);
+        var existingPredictions = _db.Predictions
+            .Where(prediction => prediction.ParticipantId == participantId && roundMatches.Keys.Contains(prediction.MatchId))
+            .ToDictionary(prediction => prediction.MatchId);
+
+        var savedCount = 0;
+        var removedCount = 0;
+        var incompleteCount = 0;
+        var lockedCount = 0;
+
+        foreach (var draft in drafts)
+        {
+            if (!roundMatches.TryGetValue(draft.MatchId, out var match))
+            {
+                continue;
+            }
+
+            if (HasMatchStarted(match, now))
+            {
+                lockedCount++;
+                continue;
+            }
+
+            existingPredictions.TryGetValue(draft.MatchId, out var existing);
+            var qualifiedTeamCode = string.IsNullOrWhiteSpace(draft.QualifiedTeamCode)
+                ? null
+                : draft.QualifiedTeamCode.Trim();
+            var hasAnyValue = draft.HomeGoals.HasValue || draft.AwayGoals.HasValue || !string.IsNullOrWhiteSpace(qualifiedTeamCode);
+
+            if (!hasAnyValue)
+            {
+                if (existing is not null && !existing.IsFinal)
+                {
+                    _db.Predictions.Remove(existing);
+                    existingPredictions.Remove(draft.MatchId);
+                    removedCount++;
+                }
+
+                continue;
+            }
+
+            if (!draft.HomeGoals.HasValue || !draft.AwayGoals.HasValue)
+            {
+                incompleteCount++;
+                continue;
+            }
+
+            if (existing?.IsFinal == true)
+            {
+                lockedCount++;
+                continue;
+            }
+
+            if (existing is null)
+            {
+                var created = new Prediction
+                {
+                    ParticipantId = participantId,
+                    MatchId = draft.MatchId,
+                    HomeGoals = draft.HomeGoals.Value,
+                    AwayGoals = draft.AwayGoals.Value,
+                    QualifiedTeamCode = qualifiedTeamCode,
+                    SavedAt = now
+                };
+
+                _db.Predictions.Add(created);
+                existingPredictions[draft.MatchId] = created;
+            }
+            else
+            {
+                existing.HomeGoals = draft.HomeGoals.Value;
+                existing.AwayGoals = draft.AwayGoals.Value;
+                existing.QualifiedTeamCode = qualifiedTeamCode;
+                existing.SavedAt = now;
+            }
+
+            savedCount++;
+        }
+
+        _db.SaveChanges();
+
+        message = BuildRoundDraftSaveMessage(savedCount, removedCount, incompleteCount, lockedCount);
+        return true;
+    }
+
     public bool FinalizeRound(int participantId, int roundId, out string message)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         if (!IsRoundAvailable(participantId, roundId, out var lockReason))
         {
             message = lockReason ?? "Esta rodada ainda esta bloqueada.";
@@ -313,6 +427,7 @@ public sealed class BolaoRepository
 
     public bool CanSendPredictionAudit(int participantId, int roundId)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
         return GetRoundPrediction(participantId, roundId).CanSendAudit;
     }
 
@@ -331,6 +446,8 @@ public sealed class BolaoRepository
 
     public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         reason = null;
         if (roundId <= 1)
         {
@@ -373,6 +490,8 @@ public sealed class BolaoRepository
 
     public IReadOnlyList<RankingEntry> GetRanking()
     {
+        AutoFinalizeStartedPredictionsAndRounds();
+
         var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
         var matches = _db.Matches.ToDictionary(match => match.Id);
         var predictions = _db.Predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
@@ -406,6 +525,7 @@ public sealed class BolaoRepository
 
     public bool IsRoundFinalized(int participantId, int roundId)
     {
+        AutoFinalizeStartedPredictionsAndRounds();
         return _db.RoundSubmissions.Any(item => item.ParticipantId == participantId && item.RoundId == roundId);
     }
 
@@ -517,6 +637,145 @@ public sealed class BolaoRepository
         }
 
         return false;
+    }
+
+    private void AutoFinalizeStartedPredictionsAndRounds()
+    {
+        if (_autoFinalizeSynchronized || _autoFinalizeRunning)
+        {
+            return;
+        }
+
+        _autoFinalizeRunning = true;
+
+        try
+        {
+        var now = DateTimeOffset.UtcNow;
+        var matches = _db.Matches
+            .Select(match => new
+            {
+                match.Id,
+                match.RoundId,
+                Kickoff = match.Kickoff.ToUniversalTime()
+            })
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            return;
+        }
+
+        var startedMatches = matches
+            .Where(match => now >= match.Kickoff)
+            .ToList();
+        var startedMatchIds = startedMatches
+            .Select(match => match.Id)
+            .ToHashSet();
+        var startedKickoffs = startedMatches.ToDictionary(match => match.Id, match => match.Kickoff);
+        var changed = false;
+
+        if (startedMatchIds.Count > 0)
+        {
+            var startedDrafts = _db.Predictions
+                .Where(prediction => prediction.SubmittedAt == null && startedMatchIds.Contains(prediction.MatchId))
+                .ToList();
+
+            foreach (var prediction in startedDrafts)
+            {
+                prediction.SubmittedAt = startedKickoffs[prediction.MatchId];
+                changed = true;
+            }
+        }
+
+        var fullyStartedRounds = matches
+            .GroupBy(match => match.RoundId)
+            .Where(group => group.All(match => now >= match.Kickoff))
+            .Select(group => new
+            {
+                RoundId = group.Key,
+                SubmittedAt = group.Max(match => match.Kickoff)
+            })
+            .ToList();
+
+        if (fullyStartedRounds.Count > 0)
+        {
+            var participantIds = _db.Participants.Select(participant => participant.Id).ToList();
+            var roundIds = fullyStartedRounds.Select(round => round.RoundId).ToHashSet();
+            var existingSubmissions = _db.RoundSubmissions
+                .Where(submission => roundIds.Contains(submission.RoundId))
+                .ToList()
+                .Select(submission => (submission.ParticipantId, submission.RoundId))
+                .ToHashSet();
+
+            foreach (var participantId in participantIds)
+            {
+                foreach (var round in fullyStartedRounds)
+                {
+                    if (existingSubmissions.Contains((participantId, round.RoundId)))
+                    {
+                        continue;
+                    }
+
+                    _db.RoundSubmissions.Add(new RoundSubmission
+                    {
+                        ParticipantId = participantId,
+                        RoundId = round.RoundId,
+                        SubmittedAt = round.SubmittedAt
+                    });
+                    existingSubmissions.Add((participantId, round.RoundId));
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            _db.SaveChanges();
+        }
+
+        _autoFinalizeSynchronized = true;
+        }
+        finally
+        {
+            _autoFinalizeRunning = false;
+        }
+    }
+
+    private static string BuildRoundDraftSaveMessage(int savedCount, int removedCount, int incompleteCount, int lockedCount)
+    {
+        var parts = new List<string>();
+
+        if (savedCount > 0)
+        {
+            parts.Add(savedCount == 1
+                ? "1 rascunho salvo."
+                : $"{savedCount} rascunhos salvos.");
+        }
+
+        if (removedCount > 0)
+        {
+            parts.Add(removedCount == 1
+                ? "1 rascunho em branco foi removido."
+                : $"{removedCount} rascunhos em branco foram removidos.");
+        }
+
+        if (incompleteCount > 0)
+        {
+            parts.Add(incompleteCount == 1
+                ? "1 partida incompleta nao foi salva."
+                : $"{incompleteCount} partidas incompletas nao foram salvas.");
+        }
+
+        if (lockedCount > 0)
+        {
+            parts.Add(lockedCount == 1
+                ? "1 partida ja estava bloqueada pelo horario."
+                : $"{lockedCount} partidas ja estavam bloqueadas pelo horario.");
+        }
+
+        return parts.Count == 0
+            ? "Nenhuma alteracao para salvar."
+            : string.Join(' ', parts);
     }
 
     private static bool HasBlankSpecialPrediction(string champion, string runnerUp, string topScorer, string goldenBall)
