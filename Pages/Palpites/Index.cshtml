@@ -139,7 +139,12 @@
         </form>
         @if (Model.RoundView.CanSendAudit)
         {
-            <a class="btn-app secondary link-button no-margin" asp-page-handler="DownloadAudit" asp-route-roundId="@Model.RoundView.Round.Id">Baixar comprovante</a>
+            <button type="button"
+                    class="btn-app secondary"
+                    data-fetch-download-url="@Url.Page("/Palpites/Index", "DownloadAudit", new { roundId = Model.RoundView.Round.Id })"
+                    data-loading-message="Gerando comprovante da rodada...">
+                Baixar comprovante
+            </button>
         }
         else
         {

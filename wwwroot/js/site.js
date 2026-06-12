@@ -40,9 +40,79 @@
         }
     };
 
+    const parseDownloadFileName = (contentDisposition) => {
+        if (!contentDisposition) {
+            return null;
+        }
+
+        const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+        if (utf8Match?.[1]) {
+            return decodeURIComponent(utf8Match[1]);
+        }
+
+        const asciiMatch = contentDisposition.match(/filename\s*=\s*"?([^";]+)"?/i);
+        return asciiMatch?.[1] ?? null;
+    };
+
+    const downloadFile = async (url, customMessage) => {
+        show(customMessage || "Preparando arquivo...");
+
+        try {
+            const requestUrl = new URL(url, window.location.href);
+            requestUrl.searchParams.set("_dl", Date.now().toString());
+
+            const response = await fetch(requestUrl, {
+                cache: "no-store",
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            const contentType = response.headers.get("content-type") || "";
+            if (response.redirected || !contentType.includes("image/png")) {
+                hide();
+                window.location.assign(response.url);
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error("Nao foi possivel baixar o arquivo agora.");
+            }
+
+            const blob = await response.blob();
+            if (!blob.size) {
+                throw new Error("O arquivo gerado veio vazio.");
+            }
+
+            const fileName = parseDownloadFileName(response.headers.get("content-disposition")) || "comprovante.png";
+            const blobUrl = window.URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = blobUrl;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+        } finally {
+            hide();
+        }
+    };
+
     window.appLoading = { show, hide };
+    window.appDownloads = { downloadFile };
 
     document.addEventListener("click", (event) => {
+        const downloadTrigger = event.target.closest("[data-fetch-download-url]");
+        if (downloadTrigger) {
+            event.preventDefault();
+            downloadFile(downloadTrigger.dataset.fetchDownloadUrl, downloadTrigger.dataset.loadingMessage)
+                .catch(error => {
+                    window.alert(error?.message || "Nao foi possivel baixar o arquivo agora.");
+                });
+            return;
+        }
+
         const anchor = event.target.closest("a[href]");
         if (!anchor) {
             return;
