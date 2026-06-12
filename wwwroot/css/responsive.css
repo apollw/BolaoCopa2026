@@ -138,6 +138,11 @@
     text-align: left;
   }
 
+  .mural-participant-toggle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .mural-special-grid {
     grid-template-columns: 1fr;
   }

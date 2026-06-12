@@ -76,8 +76,51 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        var rounds = Rounds;
         var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
+        var definitiveCounts = _db.Predictions
+            .Where(prediction => prediction.SubmittedAt != null)
+            .GroupBy(prediction => prediction.ParticipantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count());
+        var finalizedRoundCounts = _db.RoundSubmissions
+            .GroupBy(submission => submission.ParticipantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count());
+        var specialPredictionParticipantIds = _db.SpecialPredictions
+            .Where(prediction => prediction.SubmittedAt != null)
+            .Select(prediction => prediction.ParticipantId)
+            .ToHashSet();
+
+        var participantViews = participants
+            .Select(participant =>
+                new PublicParticipantSummary
+                {
+                    Participant = participant,
+                    DefinitivePredictionCount = definitiveCounts.GetValueOrDefault(participant.Id),
+                    FinalizedRoundCount = finalizedRoundCounts.GetValueOrDefault(participant.Id),
+                    HasSpecialPrediction = specialPredictionParticipantIds.Contains(participant.Id)
+                })
+            .ToList();
+
+        return new PublicPredictionsWallView
+        {
+            Participants = participantViews
+        };
+    }
+
+    public PublicParticipantPredictions? GetPublicParticipantPredictions(int participantId)
+    {
+        AutoFinalizeStartedPredictionsAndRounds();
+
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var rounds = Rounds;
         var matches = _db.Matches
             .ToList()
             .OrderBy(match => match.Kickoff)
@@ -86,98 +129,75 @@ public sealed class BolaoRepository
         var matchesByRound = matches
             .GroupBy(match => match.RoundId)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<Match>)group.ToList());
-        var predictions = _db.Predictions.ToList();
-        var predictionsByParticipant = predictions
-            .GroupBy(prediction => prediction.ParticipantId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.ToDictionary(prediction => prediction.MatchId));
-        var submissions = _db.RoundSubmissions.ToList();
-        var submissionsByParticipant = submissions
-            .GroupBy(submission => submission.ParticipantId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.ToDictionary(submission => submission.RoundId));
-        var specialPredictions = _db.SpecialPredictions
-            .Where(prediction => prediction.SubmittedAt != null)
-            .ToDictionary(prediction => prediction.ParticipantId);
+        var participantPredictions = _db.Predictions
+            .Where(prediction => prediction.ParticipantId == participantId)
+            .ToDictionary(prediction => prediction.MatchId);
+        var participantSubmissions = _db.RoundSubmissions
+            .Where(submission => submission.ParticipantId == participantId)
+            .ToDictionary(submission => submission.RoundId);
+        var specialPrediction = _db.SpecialPredictions
+            .SingleOrDefault(prediction => prediction.ParticipantId == participantId && prediction.SubmittedAt != null);
 
-        var participantViews = participants
-            .Select(participant =>
+        var roundViews = rounds
+            .Select(round =>
             {
-                var participantPredictions = predictionsByParticipant.GetValueOrDefault(participant.Id) ?? [];
-                var participantSubmissions = submissionsByParticipant.GetValueOrDefault(participant.Id) ?? [];
+                var roundMatches = matchesByRound.GetValueOrDefault(round.Id) ?? [];
+                participantSubmissions.TryGetValue(round.Id, out var submission);
 
-                var roundViews = rounds
-                    .Select(round =>
+                var lines = roundMatches
+                    .Select(match =>
                     {
-                        var roundMatches = matchesByRound.GetValueOrDefault(round.Id) ?? [];
-                        participantSubmissions.TryGetValue(round.Id, out var submission);
+                        participantPredictions.TryGetValue(match.Id, out var prediction);
+                        var definitivePrediction = prediction?.SubmittedAt is not null ? prediction : null;
 
-                        var lines = roundMatches
-                            .Select(match =>
-                            {
-                                participantPredictions.TryGetValue(match.Id, out var prediction);
-                                var definitivePrediction = prediction?.SubmittedAt is not null ? prediction : null;
-
-                                return new PublicMatchPredictionLine
-                                {
-                                    OfficialNumber = match.OfficialNumber,
-                                    HomeTeamCode = match.HomeTeam.Code,
-                                    HomeTeamName = match.HomeTeam.Name,
-                                    AwayTeamCode = match.AwayTeam.Code,
-                                    AwayTeamName = match.AwayTeam.Name,
-                                    Kickoff = match.Kickoff,
-                                    HomeGoals = definitivePrediction?.HomeGoals,
-                                    AwayGoals = definitivePrediction?.AwayGoals,
-                                    QualifiedTeamCode = definitivePrediction?.QualifiedTeamCode,
-                                    QualifiedTeamName = definitivePrediction is null
-                                        ? null
-                                        : ResolveQualifiedTeam(match, definitivePrediction.QualifiedTeamCode),
-                                    SubmittedAt = definitivePrediction?.SubmittedAt,
-                                    Outcome = ResolvePublicPredictionOutcome(match, definitivePrediction)
-                                };
-                            })
-                            .ToList();
-
-                        return new PublicRoundPredictions
+                        return new PublicMatchPredictionLine
                         {
-                            Round = round,
-                            Predictions = lines,
-                            IsFinalized = submission is not null,
-                            FinalizedAt = submission?.SubmittedAt,
-                            DefinitiveCount = lines.Count(line => line.HasDefinitivePrediction),
-                            TotalMatches = lines.Count
+                            OfficialNumber = match.OfficialNumber,
+                            HomeTeamCode = match.HomeTeam.Code,
+                            HomeTeamName = match.HomeTeam.Name,
+                            AwayTeamCode = match.AwayTeam.Code,
+                            AwayTeamName = match.AwayTeam.Name,
+                            Kickoff = match.Kickoff,
+                            HomeGoals = definitivePrediction?.HomeGoals,
+                            AwayGoals = definitivePrediction?.AwayGoals,
+                            QualifiedTeamCode = definitivePrediction?.QualifiedTeamCode,
+                            QualifiedTeamName = definitivePrediction is null
+                                ? null
+                                : ResolveQualifiedTeam(match, definitivePrediction.QualifiedTeamCode),
+                            SubmittedAt = definitivePrediction?.SubmittedAt,
+                            Outcome = ResolvePublicPredictionOutcome(match, definitivePrediction)
                         };
                     })
                     .ToList();
 
-                specialPredictions.TryGetValue(participant.Id, out var specialPrediction);
-
-                return new PublicParticipantPredictions
+                return new PublicRoundPredictions
                 {
-                    Participant = participant,
-                    Rounds = roundViews,
-                    SpecialPrediction = specialPrediction is null
-                        ? null
-                        : new PublicSpecialPredictionCard
-                        {
-                            Champion = specialPrediction.Champion,
-                            RunnerUp = specialPrediction.RunnerUp,
-                            TopScorer = specialPrediction.TopScorer,
-                            GoldenBall = specialPrediction.GoldenBall,
-                            SubmittedAt = specialPrediction.SubmittedAt!.Value
-                        },
-                    DefinitivePredictionCount = roundViews.Sum(round => round.DefinitiveCount),
-                    FinalizedRoundCount = roundViews.Count(round => round.IsFinalized)
+                    Round = round,
+                    Predictions = lines,
+                    IsFinalized = submission is not null,
+                    FinalizedAt = submission?.SubmittedAt,
+                    DefinitiveCount = lines.Count(line => line.HasDefinitivePrediction),
+                    TotalMatches = lines.Count
                 };
             })
             .ToList();
 
-        return new PublicPredictionsWallView
+        return new PublicParticipantPredictions
         {
-            Participants = participantViews,
-            Rounds = rounds
+            Participant = participant,
+            Rounds = roundViews,
+            SpecialPrediction = specialPrediction is null
+                ? null
+                : new PublicSpecialPredictionCard
+                {
+                    Champion = specialPrediction.Champion,
+                    RunnerUp = specialPrediction.RunnerUp,
+                    TopScorer = specialPrediction.TopScorer,
+                    GoldenBall = specialPrediction.GoldenBall,
+                    SubmittedAt = specialPrediction.SubmittedAt!.Value
+                },
+            DefinitivePredictionCount = roundViews.Sum(round => round.DefinitiveCount),
+            FinalizedRoundCount = roundViews.Count(round => round.IsFinalized)
         };
     }
 

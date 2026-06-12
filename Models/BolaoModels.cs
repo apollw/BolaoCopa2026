@@ -126,8 +126,15 @@ public sealed class DashboardStats
 
 public sealed class PublicPredictionsWallView
 {
-    public required IReadOnlyList<PublicParticipantPredictions> Participants { get; init; }
-    public required IReadOnlyList<PredictionRound> Rounds { get; init; }
+    public required IReadOnlyList<PublicParticipantSummary> Participants { get; init; }
+}
+
+public sealed class PublicParticipantSummary
+{
+    public required Participant Participant { get; init; }
+    public int DefinitivePredictionCount { get; init; }
+    public int FinalizedRoundCount { get; init; }
+    public bool HasSpecialPrediction { get; init; }
 }
 
 public sealed class PublicParticipantPredictions
