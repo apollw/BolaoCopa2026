@@ -118,11 +118,84 @@ public sealed class DashboardStats
     public required IReadOnlyList<GroupStanding> GroupStandings { get; init; }
     public required IReadOnlyList<Match> UpcomingMatches { get; init; }
     public required IReadOnlyList<Match> CompletedMatches { get; init; }
-    public required IReadOnlyList<SpecialPrediction> SpecialPredictions { get; init; }
     public int TotalMatches { get; init; }
     public int CompletedCount { get; init; }
     public int BrazilMatchesCompleted { get; init; }
     public int GoalsScored { get; init; }
+}
+
+public sealed class PublicPredictionsWallView
+{
+    public required IReadOnlyList<PublicParticipantSummary> Participants { get; init; }
+}
+
+public sealed class PublicParticipantSummary
+{
+    public required Participant Participant { get; init; }
+    public int DefinitivePredictionCount { get; init; }
+    public int FinalizedRoundCount { get; init; }
+    public bool HasSpecialPrediction { get; init; }
+}
+
+public sealed class PublicParticipantPredictions
+{
+    public required Participant Participant { get; init; }
+    public required IReadOnlyList<PublicRoundPredictions> Rounds { get; init; }
+    public PublicSpecialPredictionCard? SpecialPrediction { get; init; }
+    public int DefinitivePredictionCount { get; init; }
+    public int FinalizedRoundCount { get; init; }
+}
+
+public sealed class PublicRoundPredictions
+{
+    public required PredictionRound Round { get; init; }
+    public required IReadOnlyList<PublicMatchPredictionLine> Predictions { get; init; }
+    public bool IsFinalized { get; init; }
+    public DateTimeOffset? FinalizedAt { get; init; }
+    public int DefinitiveCount { get; init; }
+    public int TotalMatches { get; init; }
+}
+
+public enum PublicPredictionOutcome
+{
+    PendingOfficialResult,
+    ExactScore,
+    ResultHit,
+    Miss
+}
+
+public sealed class PublicMatchPredictionLine
+{
+    public required int OfficialNumber { get; init; }
+    public required string HomeTeamCode { get; init; }
+    public required string HomeTeamName { get; init; }
+    public required string AwayTeamCode { get; init; }
+    public required string AwayTeamName { get; init; }
+    public required DateTimeOffset Kickoff { get; init; }
+    public int? HomeGoals { get; init; }
+    public int? AwayGoals { get; init; }
+    public string? QualifiedTeamCode { get; init; }
+    public string? QualifiedTeamName { get; init; }
+    public DateTimeOffset? SubmittedAt { get; init; }
+    public PublicPredictionOutcome Outcome { get; init; }
+    public string OutcomeCssClass => Outcome.ToString().ToLowerInvariant();
+    public string OutcomeLabel => Outcome switch
+    {
+        PublicPredictionOutcome.ExactScore => "Exato",
+        PublicPredictionOutcome.ResultHit => "Resultado",
+        PublicPredictionOutcome.Miss => "Erro",
+        _ => "Aguardando resultado"
+    };
+    public bool HasDefinitivePrediction => SubmittedAt is not null;
+}
+
+public sealed class PublicSpecialPredictionCard
+{
+    public required string Champion { get; init; }
+    public required string RunnerUp { get; init; }
+    public required string TopScorer { get; init; }
+    public required string GoldenBall { get; init; }
+    public required DateTimeOffset SubmittedAt { get; init; }
 }
 
 public sealed class RoundPredictionView
@@ -132,6 +205,10 @@ public sealed class RoundPredictionView
     public bool IsLocked { get; init; }
     public bool IsFinalized { get; init; }
     public int DraftCount { get; init; }
+    public int MissingCount { get; init; }
+    public int StartedMatchCount { get; init; }
+    public int StartedWithoutPredictionCount { get; init; }
+    public int OpenWithoutPredictionCount { get; init; }
     public string? LockReason { get; init; }
     public bool CanSendAudit => IsFinalized && !IsLocked;
 }
@@ -140,6 +217,16 @@ public sealed class MatchPredictionView
 {
     public required Match Match { get; init; }
     public Prediction? Prediction { get; init; }
+    public bool HasStarted { get; init; }
+    public bool CanEdit { get; init; }
+}
+
+public sealed class RoundDraftUpdate
+{
+    public int MatchId { get; init; }
+    public int? HomeGoals { get; init; }
+    public int? AwayGoals { get; init; }
+    public string? QualifiedTeamCode { get; init; }
 }
 
 public sealed class ResultAudit
@@ -184,11 +271,12 @@ public sealed class AuditPredictionLine
     public required int OfficialNumber { get; init; }
     public required string HomeTeam { get; init; }
     public required string AwayTeam { get; init; }
-    public required int HomeGoals { get; init; }
-    public required int AwayGoals { get; init; }
+    public int? HomeGoals { get; init; }
+    public int? AwayGoals { get; init; }
     public string? QualifiedTeam { get; init; }
-    public required DateTimeOffset SavedAt { get; init; }
-    public required DateTimeOffset SubmittedAt { get; init; }
+    public DateTimeOffset? SavedAt { get; init; }
+    public DateTimeOffset? SubmittedAt { get; init; }
+    public bool HasPrediction => HomeGoals is not null && AwayGoals is not null;
 }
 
 public sealed class SpecialAuditSnapshot

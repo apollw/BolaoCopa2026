@@ -22,6 +22,9 @@ public class IndexModel : PageModel
     public IReadOnlySet<int> AvailableRoundIds { get; private set; } = new HashSet<int>();
     public RoundPredictionView RoundView { get; private set; } = default!;
 
+    [BindProperty]
+    public List<RoundDraftUpdate> Drafts { get; set; } = [];
+
     public void OnGet(int? roundId)
     {
         LoadData(roundId);
@@ -30,6 +33,19 @@ public class IndexModel : PageModel
     public IActionResult OnPostSaveDraft(int roundId, int matchId, int homeGoals, int awayGoals, string? qualifiedTeamCode)
     {
         _repository.SaveDraftPrediction(_repository.CurrentParticipantId, matchId, homeGoals, awayGoals, qualifiedTeamCode, out var message);
+        TempData["Status"] = message;
+        return RedirectToPage(new { roundId });
+    }
+
+    public IActionResult OnPostSaveAllDrafts(int roundId)
+    {
+        var success = _repository.SaveRoundDrafts(_repository.CurrentParticipantId, roundId, Drafts, out var message);
+
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+        {
+            return new JsonResult(new { success, message });
+        }
+
         TempData["Status"] = message;
         return RedirectToPage(new { roundId });
     }
@@ -43,6 +59,12 @@ public class IndexModel : PageModel
 
     public IActionResult OnGetDownloadAudit(int roundId)
     {
+        if (!_repository.CanSendPredictionAudit(_repository.CurrentParticipantId, roundId))
+        {
+            TempData["Status"] = "Comprovante bloqueado: finalize a rodada antes de baixar.";
+            return RedirectToPage(new { roundId });
+        }
+
         var snapshot = _auditImageService.BuildSnapshot(_repository.CurrentParticipantId, roundId);
         if (snapshot is null)
         {
@@ -50,10 +72,10 @@ public class IndexModel : PageModel
             return RedirectToPage(new { roundId });
         }
 
-        var image = _auditImageService.RenderSvg(snapshot);
+        var image = _auditImageService.RenderPng(snapshot);
         _auditImageService.MarkDownloaded(snapshot);
-        var fileName = $"auditoria-rodada-{roundId}-{snapshot.Participant.Id}.svg";
-        return File(image, "image/svg+xml", fileName);
+        var fileName = $"auditoria-rodada-{roundId}-{snapshot.Participant.Id}.png";
+        return File(image, "image/png", fileName);
     }
 
     private void LoadData(int? roundId)

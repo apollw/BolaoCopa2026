@@ -31,8 +31,8 @@
         <strong>@Model.Stats.BrazilMatchesCompleted</strong>
     </article>
     <article>
-        <span>Palpites especiais</span>
-        <strong>@Model.Stats.SpecialPredictions.Count</strong>
+        <span>Participantes</span>
+        <strong>@Model.Stats.Ranking.Count</strong>
     </article>
 </section>
 
@@ -43,7 +43,7 @@
             <span>desempate aplicado</span>
         </div>
         <div class="table-wrap">
-            <table class="app-table">
+            <table class="app-table app-table-stack">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -57,12 +57,25 @@
                     @for (var index = 0; index < Model.Stats.Ranking.Count; index++)
                     {
                         var entry = Model.Stats.Ranking[index];
+                        var placeClass = index switch
+                        {
+                            0 => "first-place",
+                            1 => "second-place",
+                            2 => "third-place",
+                            _ => "default-place"
+                        };
                         <tr>
-                            <td>@(index + 1)</td>
-                            <td>@entry.Participant.Name</td>
-                            <td><strong>@entry.Points</strong></td>
-                            <td>@entry.ExactScores</td>
-                            <td>@entry.KnockoutQualifiedHits</td>
+                            <td data-label="Posicao">
+                                <span class="ranking-position @placeClass">#@(index + 1)</span>
+                            </td>
+                            <td data-label="Participante">
+                                <span class="ranking-name">@entry.Participant.Name</span>
+                            </td>
+                            <td data-label="Pontos">
+                                <strong class="ranking-points">@entry.Points</strong>
+                            </td>
+                            <td data-label="Exatos">@entry.ExactScores</td>
+                            <td data-label="Classif.">@entry.KnockoutQualifiedHits</td>
                         </tr>
                     }
                 </tbody>
@@ -78,9 +91,27 @@
         <div class="match-list">
             @foreach (var match in Model.Stats.UpcomingMatches)
             {
+                var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+                var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
                 <article class="match-row">
                     <div>
-                        <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                        <strong class="team-line">
+                            <span class="team-label">
+                                @if (homeFlag is not null)
+                                {
+                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                            </span>
+                            <span class="team-vs">x</span>
+                            <span class="team-label">
+                                @if (awayFlag is not null)
+                                {
+                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                            </span>
+                        </strong>
                         <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
                     </div>
                     @if (match.IncludesBrazil)
@@ -91,6 +122,14 @@
             }
         </div>
     </div>
+</section>
+
+<section class="panel muted-panel">
+    <div class="panel-heading">
+        <h2>Mural de Palpites</h2>
+        <a asp-page="/Mural">abrir mural completo</a>
+    </div>
+    <p>Consulte os palpites definitivos de todos os participantes, inclusive os especiais, em uma tela dedicada por participante e por rodada.</p>
 </section>
 
 <section class="panel">
@@ -104,7 +143,7 @@
             <article class="group-table">
                 <h3>@group.GroupName</h3>
                 <div class="table-wrap">
-                    <table class="app-table compact-table">
+                    <table class="app-table app-table-stack compact-table">
                         <thead>
                             <tr>
                                 <th>Selecao</th>
@@ -116,11 +155,20 @@
                         <tbody>
                             @foreach (var entry in group.Entries)
                             {
+                                var teamFlag = TeamDisplay.GetFlagUrl(entry.Team);
                                 <tr>
-                                    <td>@entry.Team.Name</td>
-                                    <td>@entry.Played</td>
-                                    <td><strong>@entry.Points</strong></td>
-                                    <td>@entry.GoalDifference</td>
+                                    <td data-label="Selecao">
+                                        <span class="team-label">
+                                            @if (teamFlag is not null)
+                                            {
+                                                <img class="team-flag" src="@teamFlag" alt="" loading="lazy" />
+                                            }
+                                            <span>@TeamDisplay.GetName(entry.Team)</span>
+                                        </span>
+                                    </td>
+                                    <td data-label="Jogos">@entry.Played</td>
+                                    <td data-label="Pontos"><strong>@entry.Points</strong></td>
+                                    <td data-label="Saldo">@entry.GoalDifference</td>
                                 </tr>
                             }
                         </tbody>
@@ -151,9 +199,27 @@
         }
         @foreach (var match in Model.Stats.CompletedMatches.Take(10))
         {
+            var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+            var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
             <article class="match-row">
                 <div>
-                    <strong>@match.HomeTeam.Name @match.Result?.HomeGoals x @match.Result?.AwayGoals @match.AwayTeam.Name</strong>
+                    <strong class="team-line">
+                        <span class="team-label">
+                            @if (homeFlag is not null)
+                            {
+                                <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                        </span>
+                        <span>@match.Result?.HomeGoals x @match.Result?.AwayGoals</span>
+                        <span class="team-label">
+                            @if (awayFlag is not null)
+                            {
+                                <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                        </span>
+                    </strong>
                     <span>@(match.GroupName ?? match.Phase.ToString()) - jogo @match.OfficialNumber</span>
                 </div>
             </article>
@@ -161,19 +227,3 @@
     </div>
 </section>
 
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Palpites Especiais</h2>
-        <span>antes do inicio da Copa</span>
-    </div>
-    <div class="special-grid">
-        @foreach (var prediction in Model.Stats.SpecialPredictions)
-        {
-            <article>
-                <span>Participante @prediction.ParticipantId</span>
-                <strong>@prediction.Champion</strong>
-                <small>vice @prediction.RunnerUp | artilheiro @prediction.TopScorer | bola de ouro @prediction.GoldenBall</small>
-            </article>
-        }
-    </div>
-</section>

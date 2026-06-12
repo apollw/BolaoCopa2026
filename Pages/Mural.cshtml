@@ -1,0 +1,404 @@
+@page
+@model BolaoCopa2026.Pages.MuralModel
+@{
+    ViewData["Title"] = "Mural";
+    var detailsUrl = Url.Page("/Mural", "ParticipantDetails");
+}
+
+<section class="page-title">
+    <p class="eyebrow">Consulta Publica</p>
+    <h1>Mural de Palpites</h1>
+    <p class="hero-copy mural-copy">Agora o mural abre os palpites participante por participante. A lista inicial fica mais leve e cada detalhe so e carregado quando voce pedir.</p>
+</section>
+
+<section class="panel mural-toolbar-panel">
+    <div class="panel-heading">
+        <h2>Participantes</h2>
+        <span>@Model.Wall.Participants.Count no mural</span>
+    </div>
+    <div class="mural-filter-row" role="tablist" aria-label="Participantes do mural">
+        <button type="button" class="mural-chip active" data-participant-filter="all">Todos</button>
+        @foreach (var participant in Model.Wall.Participants)
+        {
+            <button type="button" class="mural-chip" data-participant-filter="@participant.Participant.Id">@participant.Participant.Name</button>
+        }
+    </div>
+</section>
+
+<section class="mural-grid">
+    @foreach (var participant in Model.Wall.Participants)
+    {
+        <article class="panel mural-participant-card" data-participant-card="@participant.Participant.Id">
+            <button type="button"
+                    class="mural-participant-toggle"
+                    data-participant-toggle="@participant.Participant.Id"
+                    aria-expanded="false">
+                <div>
+                    <h2>@participant.Participant.Name</h2>
+                    <span>@participant.Participant.Email</span>
+                </div>
+                <div class="mural-participant-stats">
+                    <span>@participant.DefinitivePredictionCount palpites definitivos</span>
+                    <span>@participant.FinalizedRoundCount rodadas fechadas</span>
+                    @if (participant.HasSpecialPrediction)
+                    {
+                        <span>especiais enviados</span>
+                    }
+                </div>
+            </button>
+
+            <div class="mural-collapsible-content" data-participant-content="@participant.Participant.Id" hidden>
+                <div class="mural-inline-status" data-participant-status="@participant.Participant.Id">
+                    Clique para carregar os palpites deste participante.
+                </div>
+                <div class="mural-detail-host" data-participant-detail="@participant.Participant.Id"></div>
+            </div>
+        </article>
+    }
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const detailsUrl = '@detailsUrl';
+            const participantChips = document.querySelectorAll('[data-participant-filter]');
+            const participantCards = document.querySelectorAll('[data-participant-card]');
+            const loadedDetails = new Map();
+            const activeRequests = new Map();
+
+            const escapeHtml = value => String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+
+            const teamFlag = code => {
+                const normalized = String(code ?? '').trim().toUpperCase();
+                const mapping = {
+                    ALG: 'dz',
+                    ARG: 'ar',
+                    AUS: 'au',
+                    AUT: 'at',
+                    BEL: 'be',
+                    BIH: 'ba',
+                    BRA: 'br',
+                    CAN: 'ca',
+                    COD: 'cd',
+                    COL: 'co',
+                    CPV: 'cv',
+                    CIV: 'ci',
+                    CRO: 'hr',
+                    CUW: 'cw',
+                    CZE: 'cz',
+                    ECU: 'ec',
+                    EGY: 'eg',
+                    ENG: 'gb',
+                    ESP: 'es',
+                    FRA: 'fr',
+                    GER: 'de',
+                    GHA: 'gh',
+                    HAI: 'ht',
+                    IRN: 'ir',
+                    IRQ: 'iq',
+                    JOR: 'jo',
+                    JPN: 'jp',
+                    KOR: 'kr',
+                    KSA: 'sa',
+                    MAR: 'ma',
+                    MEX: 'mx',
+                    NED: 'nl',
+                    NOR: 'no',
+                    NZL: 'nz',
+                    PAN: 'pa',
+                    PAR: 'py',
+                    POR: 'pt',
+                    QAT: 'qa',
+                    RSA: 'za',
+                    SCO: 'gb',
+                    SEN: 'sn',
+                    SUI: 'ch',
+                    SWE: 'se',
+                    TUN: 'tn',
+                    TUR: 'tr',
+                    URU: 'uy',
+                    USA: 'us',
+                    UZB: 'uz'
+                };
+
+                return mapping[normalized]
+                    ? `https://flagcdn.com/w40/${mapping[normalized]}.png`
+                    : null;
+            };
+
+            const renderTeamLabel = (code, name, inline = false) => {
+                const flag = teamFlag(code);
+                return `
+                    <span class="team-label${inline ? ' inline' : ''}">
+                        ${flag ? `<img class="team-flag" src="${flag}" alt="" loading="lazy" />` : ''}
+                        <span>${escapeHtml(name)}</span>
+                    </span>
+                `;
+            };
+
+            const outcomeLabel = outcome => {
+                switch (outcome) {
+                    case 1:
+                        return 'Exato';
+                    case 2:
+                        return 'Resultado';
+                    case 3:
+                        return 'Erro';
+                    default:
+                        return 'Aguardando resultado';
+                }
+            };
+
+            const outcomeCssClass = outcome => {
+                switch (outcome) {
+                    case 1:
+                        return 'exactscore';
+                    case 2:
+                        return 'resulthit';
+                    case 3:
+                        return 'miss';
+                    default:
+                        return 'pendingofficialresult';
+                }
+            };
+
+            const formatDate = value => {
+                if (!value) {
+                    return '';
+                }
+
+                return new Intl.DateTimeFormat('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(new Date(value));
+            };
+
+            const renderRoundPanel = (participantId, round, index) => {
+                const roundPanelId = `participant-${participantId}-round-${round.round.id}`;
+                const isVisible = index === 0;
+                const predictionItems = round.predictions.map(prediction => `
+                    <article class="mural-match-row ${prediction.hasDefinitivePrediction ? 'filled' : 'pending'}">
+                        <div>
+                            <strong>Jogo ${prediction.officialNumber}</strong>
+                            <span class="team-line">
+                                ${renderTeamLabel(prediction.homeTeamCode, prediction.homeTeamName)}
+                                <span class="team-vs">x</span>
+                                ${renderTeamLabel(prediction.awayTeamCode, prediction.awayTeamName)}
+                            </span>
+                            <small>${formatDate(prediction.kickoff)}</small>
+                        </div>
+                        ${prediction.hasDefinitivePrediction ? `
+                            <div class="mural-score">
+                                <strong>${prediction.homeGoals} x ${prediction.awayGoals}</strong>
+                                <span class="mural-indicator ${outcomeCssClass(prediction.outcome)}">${outcomeLabel(prediction.outcome)}</span>
+                                ${prediction.qualifiedTeamName ? `
+                                    <small>
+                                        classificado:
+                                        ${renderTeamLabel(prediction.qualifiedTeamCode, prediction.qualifiedTeamName, true)}
+                                    </small>
+                                ` : ''}
+                            </div>
+                        ` : `
+                            <div class="mural-score pending">
+                                <strong>Sem palpite definitivo</strong>
+                                <small>Aguardando definicao ou rodada em aberto</small>
+                            </div>
+                        `}
+                    </article>
+                `).join('');
+
+                return `
+                    <section class="mural-round-panel ${isVisible ? 'active' : ''}" id="${roundPanelId}">
+                        <div class="mural-round-meta">
+                            <strong>${escapeHtml(round.round.name)}</strong>
+                            <span>${round.isFinalized ? `Rodada finalizada em ${formatDate(round.finalizedAt)}` : 'Rodada ainda em andamento'}</span>
+                            <span>${round.definitiveCount}/${round.totalMatches} palpites definitivos</span>
+                        </div>
+                        <div class="mural-match-list">${predictionItems}</div>
+                    </section>
+                `;
+            };
+
+            const renderSpecialPanel = (participantId, specialPrediction) => {
+                if (!specialPrediction) {
+                    return '';
+                }
+
+                return `
+                    <section class="mural-round-panel" id="participant-${participantId}-special">
+                        <div class="mural-round-meta">
+                            <strong>Palpites especiais</strong>
+                            <span>Finalizados em ${formatDate(specialPrediction.submittedAt)}</span>
+                        </div>
+                        <div class="special-grid mural-special-grid">
+                            <article>
+                                <span>Campeao</span>
+                                <strong>${escapeHtml(specialPrediction.champion)}</strong>
+                            </article>
+                            <article>
+                                <span>Vice-campeao</span>
+                                <strong>${escapeHtml(specialPrediction.runnerUp)}</strong>
+                            </article>
+                            <article>
+                                <span>Artilheiro</span>
+                                <strong>${escapeHtml(specialPrediction.topScorer)}</strong>
+                            </article>
+                            <article>
+                                <span>Bola de Ouro</span>
+                                <strong>${escapeHtml(specialPrediction.goldenBall)}</strong>
+                            </article>
+                        </div>
+                    </section>
+                `;
+            };
+
+            const renderParticipantDetail = participant => {
+                const roundTabs = participant.rounds.map((round, index) => `
+                    <button type="button"
+                            class="mural-chip ${index === 0 ? 'active' : ''}"
+                            data-round-target="participant-${participant.participant.id}-round-${round.round.id}">
+                        ${escapeHtml(round.round.name)}
+                    </button>
+                `).join('');
+
+                const specialTab = participant.specialPrediction
+                    ? `
+                        <button type="button"
+                                class="mural-chip"
+                                data-round-target="participant-${participant.participant.id}-special">
+                            Especiais
+                        </button>
+                    `
+                    : '';
+
+                const roundPanels = participant.rounds
+                    .map((round, index) => renderRoundPanel(participant.participant.id, round, index))
+                    .join('');
+
+                return `
+                    <div class="mural-filter-row mural-round-tabs" role="tablist" aria-label="Rodadas de ${escapeHtml(participant.participant.name)}">
+                        ${roundTabs}
+                        ${specialTab}
+                    </div>
+                    <div class="mural-panels">
+                        ${roundPanels}
+                        ${renderSpecialPanel(participant.participant.id, participant.specialPrediction)}
+                    </div>
+                `;
+            };
+
+            const bindRoundTabs = card => {
+                card.querySelectorAll('.mural-round-tabs').forEach(tabRow => {
+                    const buttons = tabRow.querySelectorAll('[data-round-target]');
+                    const panels = card.querySelectorAll('.mural-round-panel');
+
+                    buttons.forEach(button => {
+                        button.addEventListener('click', () => {
+                            const target = button.dataset.roundTarget;
+
+                            buttons.forEach(item => item.classList.toggle('active', item === button));
+                            panels.forEach(panel => panel.classList.toggle('active', panel.id === target));
+                        });
+                    });
+                });
+            };
+
+            const ensureParticipantLoaded = async participantId => {
+                if (loadedDetails.has(participantId)) {
+                    return loadedDetails.get(participantId);
+                }
+
+                if (activeRequests.has(participantId)) {
+                    return activeRequests.get(participantId);
+                }
+
+                const requestUrl = new URL(detailsUrl, window.location.origin);
+                requestUrl.searchParams.set('participantId', participantId);
+
+                const request = fetch(requestUrl, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(async response => {
+                        if (!response.ok) {
+                            throw new Error('Falha ao carregar os palpites deste participante.');
+                        }
+
+                        const payload = await response.json();
+                        loadedDetails.set(participantId, payload);
+                        return payload;
+                    })
+                    .finally(() => {
+                        activeRequests.delete(participantId);
+                    });
+
+                activeRequests.set(participantId, request);
+                return request;
+            };
+
+            const setExpanded = async (participantId, shouldExpand) => {
+                const card = document.querySelector(`[data-participant-card="${participantId}"]`);
+                const toggle = card?.querySelector(`[data-participant-toggle="${participantId}"]`);
+                const content = card?.querySelector(`[data-participant-content="${participantId}"]`);
+                const status = card?.querySelector(`[data-participant-status="${participantId}"]`);
+                const host = card?.querySelector(`[data-participant-detail="${participantId}"]`);
+
+                if (!card || !toggle || !content || !status || !host) {
+                    return;
+                }
+
+                if (!shouldExpand) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                    content.hidden = true;
+                    return;
+                }
+
+                toggle.setAttribute('aria-expanded', 'true');
+                content.hidden = false;
+
+                if (host.childElementCount > 0) {
+                    return;
+                }
+
+                status.textContent = 'Carregando palpites...';
+
+                try {
+                    const participant = await ensureParticipantLoaded(participantId);
+                    host.innerHTML = renderParticipantDetail(participant);
+                    status.remove();
+                    bindRoundTabs(card);
+                } catch (error) {
+                    status.textContent = error.message ?? 'Nao foi possivel carregar os palpites agora.';
+                }
+            };
+
+            participantChips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const target = chip.dataset.participantFilter;
+
+                    participantChips.forEach(item => item.classList.toggle('active', item === chip));
+                    participantCards.forEach(card => {
+                        const shouldShow = target === 'all' || card.dataset.participantCard === target;
+                        card.hidden = !shouldShow;
+                    });
+                });
+            });
+
+            document.querySelectorAll('[data-participant-toggle]').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const participantId = button.dataset.participantToggle;
+                    const isExpanded = button.getAttribute('aria-expanded') === 'true';
+                    await setExpanded(participantId, !isExpanded);
+                });
+            });
+        })();
+    </script>
+}

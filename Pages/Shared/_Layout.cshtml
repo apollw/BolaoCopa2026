@@ -10,6 +10,14 @@
     <link rel="stylesheet" href="~/BolaoCopa2026.styles.css" asp-append-version="true" />
 </head>
 <body>
+    <div id="global-loading-overlay" class="global-loading-overlay" aria-hidden="true">
+        <div class="global-loading-card" role="status" aria-live="polite">
+            <div class="global-loading-spinner"></div>
+            <strong>Carregando</strong>
+            <span id="global-loading-message">Aguarde um instante...</span>
+        </div>
+    </div>
+
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm app-nav">
             <div class="container">
@@ -40,6 +48,9 @@
                         }
                         <li class="nav-item">
                             <a class="nav-link" asp-area="" asp-page="/Regulamento">Regulamento</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-page="/Mural">Mural</a>
                         </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {

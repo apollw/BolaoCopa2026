@@ -11,15 +11,7 @@ public static class BolaoSeedData
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BolaoDbContext>();
 
-        Directory.CreateDirectory("Data");
-        if (UsesPostgres(db))
-        {
-            db.Database.Migrate();
-        }
-        else
-        {
-            db.Database.EnsureCreated();
-        }
+        db.Database.Migrate();
 
         if (db.Rounds.Any())
         {
@@ -31,11 +23,6 @@ public static class BolaoSeedData
         db.Matches.AddRange(SeedMatches());
 
         db.SaveChanges();
-    }
-
-    private static bool UsesPostgres(BolaoDbContext db)
-    {
-        return db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static void EnsureMissingMatches(BolaoDbContext db)

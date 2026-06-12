@@ -1,0 +1,273 @@
+.special-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.groups-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.group-table {
+  border: 1px solid #edf2e9;
+  padding: 14px;
+}
+
+.group-table h3 {
+  color: #16382f;
+  font-size: 1rem;
+  font-weight: 850;
+  margin: 0 0 10px;
+}
+
+.compact-table {
+  min-width: 280px;
+}
+
+.compact-table th,
+.compact-table td {
+  padding: 8px 6px;
+}
+
+.mural-copy {
+  color: #607166;
+  margin-top: 12px;
+  max-width: 860px;
+}
+
+.mural-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.mural-toolbar-panel {
+  margin-bottom: 18px;
+}
+
+.mural-filter-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.mural-chip {
+  background: #eef3ea;
+  border: 1px solid #d4dfce;
+  border-radius: 999px;
+  color: #31443a;
+  flex: 0 0 auto;
+  font-size: 0.86rem;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 8px 14px;
+}
+
+.mural-chip.active {
+  background: #176b52;
+  border-color: #176b52;
+  color: #ffffff;
+}
+
+.mural-participant-card {
+  display: grid;
+  gap: 16px;
+}
+
+.mural-participant-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: -4px -4px 0;
+  padding: 4px;
+  text-align: left;
+  width: 100%;
+}
+
+.mural-participant-toggle::after {
+  color: #176b52;
+  content: "+";
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mural-participant-toggle[aria-expanded="true"]::after {
+  content: "\2212";
+}
+
+.mural-participant-toggle h2 {
+  margin-bottom: 4px;
+}
+
+.mural-participant-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+}
+
+.mural-collapsible-content {
+  border-top: 1px solid #edf2e9;
+  padding-top: 4px;
+}
+
+.mural-inline-status {
+  background: #eef3ea;
+  border: 1px solid #dce4d6;
+  border-radius: 8px;
+  color: #405248;
+  font-size: 0.88rem;
+  padding: 10px 12px;
+}
+
+.mural-detail-host {
+  display: grid;
+  gap: 14px;
+}
+
+.mural-round-tabs {
+  margin-top: -4px;
+}
+
+.mural-panels {
+  display: grid;
+}
+
+.mural-round-panel {
+  display: none;
+}
+
+.mural-round-panel.active {
+  display: grid;
+  gap: 14px;
+}
+
+.mural-round-meta {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.mural-round-meta strong {
+  color: #123d32;
+  flex-basis: 100%;
+  font-size: 1rem;
+}
+
+.mural-round-meta span {
+  color: #607166;
+  font-size: 0.86rem;
+}
+
+.mural-match-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mural-match-row {
+  align-items: center;
+  border: 1px solid #edf2e9;
+  border-radius: 10px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.mural-match-row.filled {
+  background: #f8faf6;
+}
+
+.mural-match-row.pending {
+  background: #fffdf1;
+}
+
+.mural-match-row small {
+  color: #879287;
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+.mural-score {
+  text-align: right;
+}
+
+.mural-score strong {
+  color: #16382f;
+  display: block;
+  font-size: 1rem;
+}
+
+.mural-indicator {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 10px;
+}
+
+.mural-indicator::before {
+  font-size: 0.86rem;
+  line-height: 1;
+}
+
+.mural-indicator.exactscore {
+  background: #dff3e7;
+  color: #176b52;
+}
+
+.mural-indicator.exactscore::before {
+  content: "\2713";
+}
+
+.mural-indicator.resulthit {
+  background: #eef3ea;
+  color: #31443a;
+}
+
+.mural-indicator.resulthit::before {
+  content: "\2713";
+}
+
+.mural-indicator.miss {
+  background: #fbe4df;
+  color: #a33a2b;
+}
+
+.mural-indicator.miss::before {
+  content: "\2715";
+}
+
+.mural-indicator.pendingofficialresult {
+  background: #fff4c2;
+  color: #664f00;
+}
+
+.mural-indicator.pendingofficialresult::before {
+  content: "\2022";
+}
+
+.mural-score small {
+  color: #607166;
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+.mural-score.pending strong {
+  color: #725700;
+}
+
+.mural-special-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

@@ -1,7 +1,10 @@
-﻿@page
+@page
 @model BolaoCopa2026.Pages.Palpites.IndexModel
 @{
     ViewData["Title"] = "Palpites";
+    var confirmMessage = Model.RoundView.MissingCount > 0
+        ? $"Finalizar esta rodada? Voce tem {Model.RoundView.MissingCount} partida(s) sem palpite, que ficarao em branco. Depois da confirmacao nao sera possivel adicionar nem editar palpites."
+        : "Finalizar esta rodada? Depois da confirmacao nao sera possivel adicionar nem editar palpites.";
 }
 
 <section class="page-title">
@@ -37,49 +40,100 @@
     {
         <div class="notice">@Model.RoundView.LockReason</div>
     }
+    else if (!Model.RoundView.IsFinalized && Model.RoundView.MissingCount > 0)
+    {
+        <div class="notice">Voce ainda tem @Model.RoundView.MissingCount partida(s) sem palpite. Se finalizar agora, elas ficarao em branco e nao poderao mais ser preenchidas.</div>
+    }
 
-    <div class="match-list">
-        @foreach (var item in Model.RoundView.Matches)
-        {
-            var match = item.Match;
-            var prediction = item.Prediction;
-            <article class="prediction-row">
-                <div>
-                    <strong>@match.OfficialNumber. @match.HomeTeam.Name x @match.AwayTeam.Name</strong>
-                    <span>@(match.GroupName ?? match.Phase.ToString()) - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
-                    @if (prediction is not null)
-                    {
-                        <small class="save-state">Salvo no perfil: @prediction.SavedAt.ToLocalTime().ToString("dd/MM HH:mm")</small>
-                    }
-                </div>
-                <form method="post" asp-page-handler="SaveDraft" class="score-form">
-                    <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
-                    <input type="hidden" name="matchId" value="@match.Id" />
-                    <input type="number" name="homeGoals" min="0" value="@(prediction?.HomeGoals ?? 0)" aria-label="Gols mandante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
-                    <span>x</span>
-                    <input type="number" name="awayGoals" min="0" value="@(prediction?.AwayGoals ?? 0)" aria-label="Gols visitante" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)" />
-                    @if (match.IsKnockout)
-                    {
-                        <select name="qualifiedTeamCode" aria-label="Classificado" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">
-                            <option value="">Classificado</option>
-                            <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@match.HomeTeam.Name</option>
-                            <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@match.AwayTeam.Name</option>
-                        </select>
-                    }
-                    <button type="submit" class="btn-app" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Salvar rascunho</button>
-                </form>
-            </article>
-        }
-    </div>
+    @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
+    {
+        <div class="notice">@Model.RoundView.StartedWithoutPredictionCount partida(s) desta rodada ja comecaram sem palpite salvo. Esses jogos permanecerao sem palpite.</div>
+    }
+
+    <form id="round-drafts-form" method="post" asp-page-handler="SaveAllDrafts">
+        <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
+
+        <div class="match-list">
+            @for (var index = 0; index < Model.RoundView.Matches.Count; index++)
+            {
+                var item = Model.RoundView.Matches[index];
+                var match = item.Match;
+                var prediction = item.Prediction;
+                var homeValue = prediction is null ? string.Empty : prediction.HomeGoals.ToString();
+                var awayValue = prediction is null ? string.Empty : prediction.AwayGoals.ToString();
+                var rowIsEditable = item.CanEdit;
+                var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+                var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
+
+                <article class="prediction-row" data-kickoff-utc="@match.Kickoff.ToUniversalTime().ToString("O")" data-row-editable="@rowIsEditable.ToString().ToLowerInvariant()">
+                    <div>
+                        <strong class="team-line">
+                            <span>@match.OfficialNumber.</span>
+                            <span class="team-label">
+                                @if (homeFlag is not null)
+                                {
+                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                            </span>
+                            <span class="team-vs">x</span>
+                            <span class="team-label">
+                                @if (awayFlag is not null)
+                                {
+                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                            </span>
+                        </strong>
+                        <span>@(match.GroupName ?? match.Phase.ToString()) - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
+                        @if (prediction is not null)
+                        {
+                            <small class="save-state">Salvo no perfil: @prediction.SavedAt.ToLocalTime().ToString("dd/MM HH:mm")</small>
+                        }
+                        else
+                        {
+                            <small class="save-state">Nenhum palpite salvo para este jogo.</small>
+                        }
+                        @if (!Model.RoundView.IsFinalized && item.HasStarted)
+                        {
+                            <small class="save-state">Partida iniciada. Este jogo nao aceita mais edicao.</small>
+                        }
+                    </div>
+
+                    <div class="score-form">
+                        <input type="hidden" name="Drafts[@index].MatchId" value="@match.Id" />
+                        <input type="number" name="Drafts[@index].HomeGoals" min="0" value="@homeValue" aria-label="Gols mandante" disabled="@(!rowIsEditable)" />
+                        <span>x</span>
+                        <input type="number" name="Drafts[@index].AwayGoals" min="0" value="@awayValue" aria-label="Gols visitante" disabled="@(!rowIsEditable)" />
+                        @if (match.IsKnockout)
+                        {
+                            <select name="Drafts[@index].QualifiedTeamCode" aria-label="Classificado" disabled="@(!rowIsEditable)">
+                                <option value="">Classificado</option>
+                                <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@TeamDisplay.GetName(match.HomeTeam)</option>
+                                <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@TeamDisplay.GetName(match.AwayTeam)</option>
+                            </select>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </form>
 </section>
 
 <section class="panel action-panel">
     <div>
         <h2>Fechamento da rodada</h2>
         <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
+        <p>Os rascunhos sao salvos automaticamente alguns segundos apos cada alteracao. Se preferir, voce tambem pode salvar tudo manualmente.</p>
+        <p>Quando o horario oficial de uma partida chega, o rascunho ja salvo para aquele jogo vira definitivo automaticamente. Se nao houver palpite salvo, a partida fica em branco. Depois da finalizacao da rodada, nao sera mais possivel adicionar nem editar palpites.</p>
+        @if (!Model.RoundView.IsFinalized && !Model.RoundView.IsLocked)
+        {
+            <small id="draft-save-status" class="save-state">Autosave ativo. As alteracoes desta rodada serao salvas automaticamente.</small>
+        }
     </div>
     <div class="action-buttons">
-        <form method="post" asp-page-handler="FinalizeRound">
+        <button type="submit" form="round-drafts-form" class="btn-app" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Salvar rascunhos</button>
+        <form method="post" asp-page-handler="FinalizeRound" onsubmit="return confirm('@confirmMessage');">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
             <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
         </form>
@@ -96,6 +150,103 @@
 
 <section class="panel muted-panel">
     <h2>Palpites especiais</h2>
-    <p>Campeao, vice, artilheiro e Bola de Ouro ficam disponiveis aqui ate o inicio da Copa.</p>
+    <p>Campeao, vice, artilheiro e Bola de Ouro ficam disponiveis aqui ate o fim da 3a rodada da fase de grupos.</p>
     <a asp-page="/Palpites/Especiais" class="btn-app link-button">Preencher especiais</a>
 </section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const form = document.getElementById('round-drafts-form');
+            const status = document.getElementById('draft-save-status');
+
+            if (!form || !status) {
+                return;
+            }
+
+            const editableInputs = Array.from(form.querySelectorAll('input[name^="Drafts["], select[name^="Drafts["]'))
+                .filter(element => element.type !== 'hidden');
+            let debounceTimer = null;
+            let currentRequest = null;
+            let hasPendingChanges = false;
+
+            const setStatus = message => {
+                status.textContent = message;
+            };
+
+            const saveDrafts = async () => {
+                if (!hasPendingChanges) {
+                    return;
+                }
+
+                hasPendingChanges = false;
+                setStatus('Salvando rascunhos...');
+
+                if (currentRequest) {
+                    currentRequest.abort();
+                }
+
+                currentRequest = new AbortController();
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        signal: currentRequest.signal
+                    });
+
+                    const payload = await response.json();
+                    setStatus(payload.message ?? 'Rascunhos salvos.');
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+
+                    hasPendingChanges = true;
+                    setStatus('Falha ao salvar rascunhos automaticamente. Use o botao "Salvar rascunhos".');
+                } finally {
+                    currentRequest = null;
+                }
+            };
+
+            const scheduleSave = () => {
+                hasPendingChanges = true;
+                setStatus('Alteracoes detectadas. Salvando em instantes...');
+                window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(saveDrafts, 800);
+            };
+
+            for (const input of editableInputs) {
+                input.addEventListener('input', scheduleSave);
+                input.addEventListener('change', scheduleSave);
+            }
+
+            const lockExpiredMatches = () => {
+                const now = Date.now();
+                const rows = form.querySelectorAll('[data-kickoff-utc][data-row-editable="true"]');
+
+                for (const row of rows) {
+                    const kickoff = Date.parse(row.dataset.kickoffUtc);
+                    if (Number.isNaN(kickoff) || now < kickoff) {
+                        continue;
+                    }
+
+                    row.dataset.rowEditable = 'false';
+                    row.querySelectorAll('input, select').forEach(element => {
+                        if (element.type !== 'hidden') {
+                            element.disabled = true;
+                        }
+                    });
+
+                    setStatus('Uma ou mais partidas acabaram de travar pelo horario oficial. Recarregue a pagina para atualizar os avisos da rodada.');
+                }
+            };
+
+            window.setInterval(lockExpiredMatches, 15000);
+            lockExpiredMatches();
+        })();
+    </script>
+}

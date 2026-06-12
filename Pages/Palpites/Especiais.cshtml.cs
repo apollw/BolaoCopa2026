@@ -71,10 +71,10 @@ public class EspeciaisModel : PageModel
             return RedirectToPage();
         }
 
-        var image = _auditImageService.RenderSpecialSvg(snapshot);
+        var image = _auditImageService.RenderSpecialPng(snapshot);
         _repository.MarkSpecialAuditDownloaded(snapshot.Participant.Id, snapshot.GeneratedAt, snapshot.ProofHash);
-        var fileName = $"auditoria-palpites-especiais-{snapshot.Participant.Id}.svg";
-        return File(image, "image/svg+xml", fileName);
+        var fileName = $"auditoria-palpites-especiais-{snapshot.Participant.Id}.png";
+        return File(image, "image/png", fileName);
     }
 
     private void LoadData()

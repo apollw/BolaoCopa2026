@@ -2,7 +2,7 @@
 
 Aplicacao web em ASP.NET Core Razor Pages para gerenciar o Bolao Premier AEW da Copa do Mundo 2026 entre amigos.
 
-O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatisticas gerais, cadastro de resultados oficiais e auditoria por comprovante baixavel. A base pode usar SQLite local ou PostgreSQL/Supabase, com autenticacao simples por email/senha.
+O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatisticas gerais, cadastro de resultados oficiais e auditoria por comprovante baixavel. A aplicacao usa PostgreSQL/Supabase em desenvolvimento e producao, com autenticacao simples por email/senha.
 
 ## Funcionalidades atuais
 
@@ -20,16 +20,10 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 
 ## Como rodar
 
-Local com SQLite:
-
-```bash
-DOTNET_CLI_HOME=.dotnet dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
-```
-
 Local com Supabase/PostgreSQL:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
 
 Acesse:
@@ -62,22 +56,15 @@ Admin:
 /Admin/Login
 ```
 
-Senha padrao atual:
-
-```text
-Soyuz123
-```
-
-Em producao, prefira configurar `Admin__Password` como variavel de ambiente no servidor.
+A senha administrativa deve ser configurada por `Admin__Password` no ambiente antes de usar `/Admin/Login`.
 
 ## Supabase/PostgreSQL
 
-O projeto pode usar SQLite local ou PostgreSQL/Supabase. Por padrao, usa SQLite.
+O projeto usa exclusivamente PostgreSQL/Supabase em desenvolvimento e producao.
 
 Para Supabase, configure variaveis de ambiente no servidor:
 
 ```bash
-Database__Provider=Postgres
 SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
 ```
 
@@ -88,7 +75,7 @@ Em PostgreSQL/Supabase, o app roda migrations automaticamente na inicializacao c
 Para aplicar migrations:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet Database__Provider=Postgres SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
+DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet tool run dotnet-ef database update --context BolaoDbContext
 ```
 
 ## Deploy Online Rapido
@@ -103,7 +90,7 @@ Passos:
 4. Configure a variavel secreta `SUPABASE_DATABASE_URL` com a URL real do Supabase.
 5. Confirme o deploy.
 
-As demais variaveis ficam em `render.yaml`: `Database__Provider=Postgres` e `ASPNETCORE_URLS=http://0.0.0.0:10000`.
+As demais variaveis ficam em `render.yaml`: `ASPNETCORE_URLS=http://0.0.0.0:10000`.
 
 Variaveis recomendadas no Render:
 

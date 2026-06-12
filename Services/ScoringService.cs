@@ -25,7 +25,7 @@ public sealed class ScoringService
         }
         else if (resultHit)
         {
-            points += 2;
+            points += 3;
         }
 
         if (qualifiedHit)
