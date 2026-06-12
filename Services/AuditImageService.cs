@@ -19,6 +19,7 @@ public sealed class AuditImageService
     private static readonly SKColor SubtleBorder = SKColor.Parse("#d4dfce");
     private static readonly SKColor RowFill = SKColor.Parse("#f8faf6");
     private static readonly SKColor RowBorder = SKColor.Parse("#edf2e9");
+    private static readonly SKTypeface TextTypeface = ResolveTypeface();
 
     private readonly BolaoDbContext _db;
 
@@ -309,12 +310,27 @@ public sealed class AuditImageService
         return new SKPaint
         {
             IsAntialias = true,
+            LcdRenderText = true,
             SubpixelText = true,
             FakeBoldText = bold,
-            Typeface = SKTypeface.Default,
+            Typeface = TextTypeface,
             TextSize = size,
             Color = color
         };
+    }
+
+    private static SKTypeface ResolveTypeface()
+    {
+        foreach (var family in new[] { "Segoe UI", "Arial", "DejaVu Sans", "Liberation Sans", "Noto Sans" })
+        {
+            var typeface = SKTypeface.FromFamilyName(family);
+            if (typeface is not null)
+            {
+                return typeface;
+            }
+        }
+
+        return SKTypeface.Default;
     }
 
     private static string TruncateText(string value, SKPaint paint, float maxWidth)

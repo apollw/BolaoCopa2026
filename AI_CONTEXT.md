@@ -15,7 +15,7 @@ O sistema permite cadastro simples por email/senha, registro de palpites por rod
 - EF Core 9
 - PostgreSQL/Supabase
 - Autenticacao por cookie
-- Bootstrap gerado pelo template + CSS customizado em `wwwroot/css/site.css`
+- Bootstrap gerado pelo template + CSS customizado modularizado em `wwwroot/css/`
 
 ## Como Rodar
 
@@ -75,14 +75,16 @@ Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core 
 - `Services/BolaoRepository.cs`: principal camada de acesso/regras de aplicacao.
 - `Services/BolaoSeedData.cs`: seed inicial apenas de rodadas e jogos da Copa.
 - `Services/ScoringService.cs`: regra de pontuacao.
-- `Services/AuditImageService.cs`: gera comprovante de auditoria em SVG com metadados e hash.
+- `Services/AuditImageService.cs`: gera comprovante de auditoria em PNG com hash.
 - `Pages/Palpites/Index.*`: tela de palpites por rodada.
 - `Pages/Palpites/Especiais.*`: tela de palpites especiais.
 - `Pages/Admin/Login.*`: login separado do organizador/admin.
 - `Pages/Admin/Resultados.*`: registro de resultados reais protegido por policy `AdminOnly`.
 - `Pages/Conta/Cadastro.*`, `Login.*`, `Logout.*`, `Perfil.*`: fluxo simples de conta.
 - `Pages/Index.*`: dashboard principal.
-- `wwwroot/css/site.css`: estilos principais.
+- `Pages/Mural.*`: mural publico de palpites com carregamento sob demanda por participante.
+- `wwwroot/css/site.css`: agregador de CSS.
+- `wwwroot/css/base.css`, `layout.css`, `components.css`, `pages.css`, `responsive.css`: estilos separados por responsabilidade.
 - `Dockerfile`, `.dockerignore`, `render.yaml`: deploy Docker no Render.
 
 ## Entidades e Conceitos
@@ -150,7 +152,7 @@ Campos:
 - `SavedAt`
 - `SubmittedAt`
 
-Enquanto `SubmittedAt == null`, e rascunho. Quando a rodada e finalizada, `SubmittedAt` recebe data/hora e o palpite fica travado.
+Enquanto `SubmittedAt == null`, e rascunho. Quando a rodada e finalizada, ou quando o horario oficial da partida chega, `SubmittedAt` recebe data/hora e o palpite fica travado.
 
 ### RoundSubmission
 
@@ -236,7 +238,9 @@ Pagina: `/Palpites`
 O usuario pode:
 
 - escolher rodada;
-- salvar rascunhos;
+- editar palpites em lote;
+- contar com autosave de rascunhos por rodada;
+- salvar rascunhos manualmente;
 - finalizar rodada;
 - baixar comprovante de auditoria quando a rodada estiver finalizada.
 
@@ -247,22 +251,26 @@ Regras de bloqueio:
 - Rodada 3 so libera quando o participante finaliza a rodada 2.
 - Rodada de 32 so libera quando todos os resultados reais da fase de grupos forem registrados pelo admin.
 - Fases seguintes do mata-mata liberam quando a fase anterior tiver todos os resultados reais registrados.
+- Cada partida bloqueia individualmente quando `now >= Kickoff`.
+- Rascunhos salvos viram definitivos automaticamente quando a partida comeca.
+- Quando todas as partidas de uma rodada ja comecaram, a rodada e considerada fechada automaticamente para o participante, mesmo com jogos em branco.
 
 Essas regras existem tanto na UI quanto no backend:
 
 - `BolaoRepository.IsRoundAvailable(...)`
+- `BolaoRepository.AutoFinalizeStartedPredictionsAndRounds()`
 
 ## Fluxo de Palpites Especiais
 
 Pagina: `/Palpites/Especiais`
 
-O participante pode salvar rascunho de campeao, vice-campeao, artilheiro e Bola de Ouro ate finalizar. Ao finalizar, `SpecialPrediction.SubmittedAt` e preenchido e os campos ficam bloqueados definitivamente. O comprovante SVG fica disponivel apenas depois da finalizacao.
+O participante pode salvar rascunho de campeao, vice-campeao, artilheiro e Bola de Ouro ate finalizar. Ao finalizar, `SpecialPrediction.SubmittedAt` e preenchido e os campos ficam bloqueados definitivamente. O comprovante PNG fica disponivel apenas depois da finalizacao.
 
 Regras principais:
 
 - rascunho pode ser editado enquanto `SubmittedAt` estiver nulo;
 - finalizacao e unica, sem edicao posterior;
-- especiais tambem bloqueiam apos o inicio da primeira partida da Copa;
+- especiais bloqueiam apos o fim da 3a rodada da fase de grupos;
 - comprovante grava hash em `SpecialPrediction.AuditProofHash` e horario em `AuditDownloadedAt`.
 
 Metodos principais:
@@ -386,7 +394,7 @@ Admin:
 
 O email do participante e salvo em `Participant.Email` e usado como identidade/login. Nao ha envio de email.
 
-A auditoria e feita por download de imagem SVG gerada pela aplicacao.
+A auditoria e feita por download de imagem PNG gerada pela aplicacao.
 
 Implementacao:
 
@@ -394,7 +402,7 @@ Implementacao:
 - `Pages/Palpites/Index.cshtml.cs`, handler `OnGetDownloadAudit`
 - `Pages/Palpites/Especiais.cshtml.cs`, handler `OnGetDownloadAudit`
 
-O SVG inclui:
+O PNG inclui:
 
 - participante;
 - email;
@@ -405,14 +413,49 @@ O SVG inclui:
 - horario de finalizacao;
 - hash SHA-256 do conteudo canonico do comprovante.
 
-O SVG grava metadados com `timezone=America/Sao_Paulo` e `generatedAtBrasilia`. O banco continua usando UTC internamente para compatibilidade correta com PostgreSQL `timestamp with time zone`.
+O banco continua usando UTC internamente para compatibilidade correta com PostgreSQL `timestamp with time zone`.
 
 O botao so fica disponivel quando a rodada esta finalizada. Se a rodada ainda estiver em rascunho ou bloqueada, o download nao e gerado.
 
-Proximo passo:
+Detalhes recentes:
 
-- se quiser PNG em vez de SVG, renderizar o SVG no browser e converter para PNG, ou adicionar uma biblioteca server-side de renderizacao.
-- criar uma tela para listar comprovantes ja gerados/baixados usando `RoundSubmission`.
+- o download usa `fetch` + blob no frontend para evitar loading global preso em links de arquivo;
+- o botao de download das auditorias nao navega mais diretamente para a URL do arquivo;
+- `AuditImageService` usa `SkiaSharp` para render server-side.
+
+## Mural Publico
+
+Pagina: `/Mural`
+
+O mural publico nao renderiza mais todos os palpites de todos os usuarios na resposta inicial. Agora ele:
+
+- carrega apenas a lista-resumo dos participantes;
+- expande cada participante sob demanda;
+- busca os palpites completos via handler `OnGetParticipantDetails`;
+- mantem as abas internas por rodada somente apos carregar o detalhe.
+
+Metodos principais:
+
+- `BolaoRepository.GetPublicPredictionsWall()`: resumo inicial;
+- `BolaoRepository.GetPublicParticipantPredictions(int participantId)`: detalhe completo de um participante.
+
+## Frontend / CSS
+
+Os estilos foram divididos para facilitar manutencao localizada:
+
+- `site.css`: ponto de entrada;
+- `base.css`: reset leve e tipografia/base;
+- `layout.css`: estrutura e grids;
+- `components.css`: tabelas, botoes, formularios e componentes compartilhados;
+- `pages.css`: regras especificas de paginas como mural;
+- `responsive.css`: media queries.
+
+Melhorias recentes:
+
+- tabelas do painel principal ganham modo empilhado no mobile;
+- cards e listas receberam mais espacamento;
+- ranking do dashboard ganhou destaque visual;
+- a interface usa loading global para submits/navegacao, com excecao tratada para downloads de auditoria.
 
 ## Problemas Resolvidos
 

@@ -71,7 +71,12 @@
         @if (Model.SpecialView.CanDownloadAudit)
         {
             <p>O comprovante registra suas escolhas, horario de finalizacao e hash de verificacao.</p>
-            <a asp-page-handler="DownloadAudit" class="btn-app secondary">Baixar comprovante</a>
+            <button type="button"
+                    class="btn-app secondary"
+                    data-fetch-download-url="@Url.Page("/Palpites/Especiais", "DownloadAudit")"
+                    data-loading-message="Gerando comprovante dos palpites especiais...">
+                Baixar comprovante
+            </button>
         }
         else
         {

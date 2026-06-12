@@ -7,15 +7,19 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 ## Funcionalidades atuais
 
 - Dashboard com ranking, lider atual, estatisticas da Copa e proximos jogos.
+- Ranking do painel com destaque visual para posicoes.
 - Regulamento do bolao com regras de pontuacao e desempate.
 - Cadastro e login por email/senha.
-- Palpites por rodada com salvamento temporario associado ao usuario autenticado.
+- Palpites por rodada com autosave, salvamento manual em lote e bloqueio por horario de partida.
 - Palpites especiais com rascunho, finalizacao unica e comprovante baixavel.
-- Finalizacao de rodada para travar os palpites.
-- Comprovante de auditoria em imagem bloqueado enquanto a rodada nao estiver finalizada.
+- Palpites especiais liberados ate o fim da 3a rodada da fase de grupos.
+- Finalizacao de rodada com confirmacao explicita e fechamento automatico por inicio das partidas.
+- Comprovante de auditoria em PNG bloqueado enquanto a rodada nao estiver finalizada.
 - Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.
 - Tabela inicial da Copa 2026 com fase de grupos e cruzamentos do mata-mata por posicao.
+- Mural publico com carregamento sob demanda por participante.
 - Interface responsiva para dispositivos moveis.
+- CSS separado por arquivos de base, layout, componentes, paginas e responsividade.
 - Deploy Docker preparado para Render.
 
 ## Como rodar
@@ -57,6 +61,22 @@ Admin:
 ```
 
 A senha administrativa deve ser configurada por `Admin__Password` no ambiente antes de usar `/Admin/Login`.
+
+## Regras principais
+
+- Placar exato vale 5 pontos.
+- Acerto do resultado vale 3 pontos.
+- Em mata-mata, acerto do classificado vale 2 pontos adicionais.
+- Jogos do Brasil dobram a pontuacao.
+- Rodadas futuras respeitam desbloqueio progressivo.
+- Cada partida trava automaticamente no horario oficial de inicio.
+- Rascunhos ja salvos viram definitivos quando a partida comeca.
+
+## Auditoria e Mural
+
+- O comprovante de auditoria e gerado no servidor em PNG via `SkiaSharp`.
+- O download usa `fetch` + blob para evitar loading infinito em links de arquivo.
+- O mural em `/Mural` mostra primeiro apenas os participantes e carrega os palpites completos sob demanda ao expandir cada usuario.
 
 ## Supabase/PostgreSQL
 
