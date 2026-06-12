@@ -43,7 +43,7 @@
             <span>desempate aplicado</span>
         </div>
         <div class="table-wrap">
-            <table class="app-table">
+            <table class="app-table app-table-stack">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -57,12 +57,25 @@
                     @for (var index = 0; index < Model.Stats.Ranking.Count; index++)
                     {
                         var entry = Model.Stats.Ranking[index];
+                        var placeClass = index switch
+                        {
+                            0 => "first-place",
+                            1 => "second-place",
+                            2 => "third-place",
+                            _ => "default-place"
+                        };
                         <tr>
-                            <td>@(index + 1)</td>
-                            <td>@entry.Participant.Name</td>
-                            <td><strong>@entry.Points</strong></td>
-                            <td>@entry.ExactScores</td>
-                            <td>@entry.KnockoutQualifiedHits</td>
+                            <td data-label="Posicao">
+                                <span class="ranking-position @placeClass">#@(index + 1)</span>
+                            </td>
+                            <td data-label="Participante">
+                                <span class="ranking-name">@entry.Participant.Name</span>
+                            </td>
+                            <td data-label="Pontos">
+                                <strong class="ranking-points">@entry.Points</strong>
+                            </td>
+                            <td data-label="Exatos">@entry.ExactScores</td>
+                            <td data-label="Classif.">@entry.KnockoutQualifiedHits</td>
                         </tr>
                     }
                 </tbody>
@@ -130,7 +143,7 @@
             <article class="group-table">
                 <h3>@group.GroupName</h3>
                 <div class="table-wrap">
-                    <table class="app-table compact-table">
+                    <table class="app-table app-table-stack compact-table">
                         <thead>
                             <tr>
                                 <th>Selecao</th>
@@ -144,7 +157,7 @@
                             {
                                 var teamFlag = TeamDisplay.GetFlagUrl(entry.Team);
                                 <tr>
-                                    <td>
+                                    <td data-label="Selecao">
                                         <span class="team-label">
                                             @if (teamFlag is not null)
                                             {
@@ -153,9 +166,9 @@
                                             <span>@TeamDisplay.GetName(entry.Team)</span>
                                         </span>
                                     </td>
-                                    <td>@entry.Played</td>
-                                    <td><strong>@entry.Points</strong></td>
-                                    <td>@entry.GoalDifference</td>
+                                    <td data-label="Jogos">@entry.Played</td>
+                                    <td data-label="Pontos"><strong>@entry.Points</strong></td>
+                                    <td data-label="Saldo">@entry.GoalDifference</td>
                                 </tr>
                             }
                         </tbody>
