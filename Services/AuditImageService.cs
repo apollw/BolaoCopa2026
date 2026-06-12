@@ -6,7 +6,7 @@ using SkiaSharp;
 
 namespace BolaoCopa2026.Services;
 
-public sealed class AuditImageService
+public sealed class AuditImageService : IDisposable
 {
     private static readonly SKColor PageBackground = SKColor.Parse("#f4f7f2");
     private static readonly SKColor CardBackground = SKColors.White;
@@ -19,13 +19,19 @@ public sealed class AuditImageService
     private static readonly SKColor SubtleBorder = SKColor.Parse("#d4dfce");
     private static readonly SKColor RowFill = SKColor.Parse("#f8faf6");
     private static readonly SKColor RowBorder = SKColor.Parse("#edf2e9");
-    private static readonly SKTypeface TextTypeface = ResolveTypeface();
 
     private readonly BolaoDbContext _db;
+    private readonly SKTypeface _textTypeface;
 
     public AuditImageService(BolaoDbContext db)
     {
         _db = db;
+        _textTypeface = ResolveTypeface();
+    }
+
+    public void Dispose()
+    {
+        _textTypeface.Dispose();
     }
 
     public AuditSnapshot? BuildSnapshot(int participantId, int roundId)
@@ -313,15 +319,25 @@ public sealed class AuditImageService
             LcdRenderText = true,
             SubpixelText = true,
             FakeBoldText = bold,
-            Typeface = TextTypeface,
+            Typeface = _textTypeface,
             TextSize = size,
             Color = color
         };
     }
 
-    private static SKTypeface ResolveTypeface()
+    private SKTypeface ResolveTypeface()
     {
-        foreach (var family in new[] { "Segoe UI", "Arial", "DejaVu Sans", "Liberation Sans", "Noto Sans" })
+        var bundledFontPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Fonts", "NotoSans-Regular.ttf");
+        if (File.Exists(bundledFontPath))
+        {
+            var bundledTypeface = SKTypeface.FromFile(bundledFontPath);
+            if (bundledTypeface is not null)
+            {
+                return bundledTypeface;
+            }
+        }
+
+        foreach (var family in new[] { "Noto Sans", "DejaVu Sans", "Liberation Sans", "Segoe UI", "Arial" })
         {
             var typeface = SKTypeface.FromFamilyName(family);
             if (typeface is not null)
