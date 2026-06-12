@@ -752,19 +752,34 @@ public sealed class BolaoRepository
             return true;
         }
 
-        var openingKickoff = _db.Matches
-            .ToList()
-            .OrderBy(match => match.Kickoff)
-            .Select(match => match.Kickoff.ToUniversalTime())
-            .FirstOrDefault();
+        var specialDeadline = GetSpecialPredictionDeadline();
 
-        if (openingKickoff != default && DateTimeOffset.UtcNow >= openingKickoff)
+        if (specialDeadline is not null && DateTimeOffset.UtcNow > specialDeadline.Value)
         {
-            reason = "Palpites especiais ficam bloqueados apos o inicio da Copa.";
+            reason = "Palpites especiais ficam bloqueados apos o fim da 3a rodada da fase de grupos.";
             return true;
         }
 
         return false;
+    }
+
+    private DateTimeOffset? GetSpecialPredictionDeadline()
+    {
+        var thirdRound = _db.Rounds.SingleOrDefault(round => round.Id == 3);
+        if (thirdRound is null)
+        {
+            return null;
+        }
+
+        return new DateTimeOffset(
+                thirdRound.EndsOn.Year,
+                thirdRound.EndsOn.Month,
+                thirdRound.EndsOn.Day,
+                23,
+                59,
+                59,
+                TimeSpan.FromHours(-3))
+            .ToUniversalTime();
     }
 
     private void AutoFinalizeStartedPredictionsAndRounds()
