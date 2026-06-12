@@ -131,7 +131,7 @@ public sealed class PublicPredictionsWallView
 
 public sealed class PublicParticipantSummary
 {
-    public required Participant Participant { get; init; }
+    public required PublicParticipantDto Participant { get; init; }
     public int DefinitivePredictionCount { get; init; }
     public int FinalizedRoundCount { get; init; }
     public bool HasSpecialPrediction { get; init; }
@@ -139,7 +139,7 @@ public sealed class PublicParticipantSummary
 
 public sealed class PublicParticipantPredictions
 {
-    public required Participant Participant { get; init; }
+    public required PublicParticipantDto Participant { get; init; }
     public required IReadOnlyList<PublicRoundPredictions> Rounds { get; init; }
     public PublicSpecialPredictionCard? SpecialPrediction { get; init; }
     public int DefinitivePredictionCount { get; init; }
@@ -285,4 +285,10 @@ public sealed class SpecialAuditSnapshot
     public required SpecialPrediction Prediction { get; init; }
     public required DateTimeOffset GeneratedAt { get; init; }
     public required string ProofHash { get; init; }
+}
+
+public sealed class PublicParticipantDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }

@@ -97,7 +97,11 @@ public sealed class BolaoRepository
             .Select(participant =>
                 new PublicParticipantSummary
                 {
-                    Participant = participant,
+                    Participant = new PublicParticipantDto
+                    {
+                        Id = participant.Id,
+                        Name = participant.Name
+                    },
                     DefinitivePredictionCount = definitiveCounts.GetValueOrDefault(participant.Id),
                     FinalizedRoundCount = finalizedRoundCounts.GetValueOrDefault(participant.Id),
                     HasSpecialPrediction = specialPredictionParticipantIds.Contains(participant.Id)
@@ -184,7 +188,11 @@ public sealed class BolaoRepository
 
         return new PublicParticipantPredictions
         {
-            Participant = participant,
+            Participant = new PublicParticipantDto
+            {
+                Id = participant.Id,
+                Name = participant.Name
+            },
             Rounds = roundViews,
             SpecialPrediction = specialPrediction is null
                 ? null
