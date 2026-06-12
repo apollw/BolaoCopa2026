@@ -311,7 +311,7 @@ public sealed class AuditImageService : IDisposable
         canvas.DrawText(TruncateText(value, valuePaint, 810), 300, baselineY - 4, valuePaint);
     }
 
-    private static SKPaint CreateTextPaint(float size, SKColor color, bool bold = false)
+    private SKPaint CreateTextPaint(float size, SKColor color, bool bold = false)
     {
         return new SKPaint
         {
