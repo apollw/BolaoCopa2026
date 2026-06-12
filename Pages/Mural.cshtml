@@ -88,10 +88,29 @@
                         <div class="mural-match-list">
                             @foreach (var prediction in round.Predictions)
                             {
+                                var homeFlag = TeamDisplay.GetFlagUrl(prediction.HomeTeamCode);
+                                var awayFlag = TeamDisplay.GetFlagUrl(prediction.AwayTeamCode);
+                                var qualifiedFlag = TeamDisplay.GetFlagUrl(prediction.QualifiedTeamCode);
                                 <article class="mural-match-row @(prediction.HasDefinitivePrediction ? "filled" : "pending")">
                                     <div>
                                         <strong>Jogo @prediction.OfficialNumber</strong>
-                                        <span>@prediction.HomeTeam x @prediction.AwayTeam</span>
+                                        <span class="team-line">
+                                            <span class="team-label">
+                                                @if (homeFlag is not null)
+                                                {
+                                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                                }
+                                                <span>@prediction.HomeTeamName</span>
+                                            </span>
+                                            <span class="team-vs">x</span>
+                                            <span class="team-label">
+                                                @if (awayFlag is not null)
+                                                {
+                                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                                }
+                                                <span>@prediction.AwayTeamName</span>
+                                            </span>
+                                        </span>
                                         <small>@prediction.Kickoff.ToLocalTime().ToString("dd/MM HH:mm")</small>
                                     </div>
                                     @if (prediction.HasDefinitivePrediction)
@@ -99,9 +118,18 @@
                                         <div class="mural-score">
                                             <strong>@prediction.HomeGoals x @prediction.AwayGoals</strong>
                                             <span class="mural-indicator @prediction.OutcomeCssClass">@prediction.OutcomeLabel</span>
-                                            @if (!string.IsNullOrWhiteSpace(prediction.QualifiedTeam))
+                                            @if (!string.IsNullOrWhiteSpace(prediction.QualifiedTeamName))
                                             {
-                                                <small>classificado: @prediction.QualifiedTeam</small>
+                                                <small>
+                                                    classificado:
+                                                    <span class="team-label inline">
+                                                        @if (qualifiedFlag is not null)
+                                                        {
+                                                            <img class="team-flag" src="@qualifiedFlag" alt="" loading="lazy" />
+                                                        }
+                                                        <span>@prediction.QualifiedTeamName</span>
+                                                    </span>
+                                                </small>
                                             }
                                         </div>
                                     }

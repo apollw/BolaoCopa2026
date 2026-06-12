@@ -160,12 +160,15 @@ public enum PublicPredictionOutcome
 public sealed class PublicMatchPredictionLine
 {
     public required int OfficialNumber { get; init; }
-    public required string HomeTeam { get; init; }
-    public required string AwayTeam { get; init; }
+    public required string HomeTeamCode { get; init; }
+    public required string HomeTeamName { get; init; }
+    public required string AwayTeamCode { get; init; }
+    public required string AwayTeamName { get; init; }
     public required DateTimeOffset Kickoff { get; init; }
     public int? HomeGoals { get; init; }
     public int? AwayGoals { get; init; }
-    public string? QualifiedTeam { get; init; }
+    public string? QualifiedTeamCode { get; init; }
+    public string? QualifiedTeamName { get; init; }
     public DateTimeOffset? SubmittedAt { get; init; }
     public PublicPredictionOutcome Outcome { get; init; }
     public string OutcomeCssClass => Outcome.ToString().ToLowerInvariant();

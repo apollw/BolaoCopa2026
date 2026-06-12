@@ -18,6 +18,7 @@ public class ResultadosModel : PageModel
 
     public IReadOnlyList<Match> PendingMatches { get; private set; } = [];
     public IReadOnlyList<ResultAudit> Audits { get; private set; } = [];
+    public IReadOnlyDictionary<int, Match> AuditMatchesById { get; private set; } = new Dictionary<int, Match>();
 
     public void OnGet()
     {
@@ -34,7 +35,9 @@ public class ResultadosModel : PageModel
 
     private void LoadData()
     {
-        PendingMatches = _repository.Matches.Where(match => match.Result is null).OrderBy(match => match.Kickoff).ToList();
+        var matches = _repository.Matches.OrderBy(match => match.Kickoff).ToList();
+        PendingMatches = matches.Where(match => match.Result is null).ToList();
         Audits = _repository.Audits.OrderByDescending(audit => audit.RegisteredAt).ToList();
+        AuditMatchesById = matches.ToDictionary(match => match.Id);
     }
 }

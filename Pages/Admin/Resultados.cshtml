@@ -23,9 +23,27 @@
     <div class="match-list">
         @foreach (var match in Model.PendingMatches)
         {
+            var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+            var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
             <article class="prediction-row">
                 <div>
-                    <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                    <strong class="team-line">
+                        <span class="team-label">
+                            @if (homeFlag is not null)
+                            {
+                                <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                        </span>
+                        <span class="team-vs">x</span>
+                        <span class="team-label">
+                            @if (awayFlag is not null)
+                            {
+                                <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                        </span>
+                    </strong>
                     <span>@match.Phase - @match.Kickoff.ToString("dd/MM/yyyy HH:mm")</span>
                 </div>
                 <form method="post" class="score-form" onsubmit="return confirm('Confirmar resultado oficial? Depois de registrado, nao sera possivel editar esta partida.');">
@@ -37,8 +55,8 @@
                     {
                         <select name="qualifiedTeamCode" aria-label="Classificado">
                             <option value="">Classificado</option>
-                            <option value="@match.HomeTeam.Code">@match.HomeTeam.Name</option>
-                            <option value="@match.AwayTeam.Code">@match.AwayTeam.Name</option>
+                            <option value="@match.HomeTeam.Code">@TeamDisplay.GetName(match.HomeTeam)</option>
+                            <option value="@match.AwayTeam.Code">@TeamDisplay.GetName(match.AwayTeam)</option>
                         </select>
                     }
                     <button type="submit" class="btn-app danger">Confirmar</button>
@@ -58,7 +76,35 @@
         {
             <article class="match-row">
                 <div>
-                    <strong>@audit.Summary</strong>
+                    @{
+                        var match = Model.AuditMatchesById.GetValueOrDefault(audit.MatchId);
+                        var homeFlag = match is null ? null : TeamDisplay.GetFlagUrl(match.HomeTeam);
+                        var awayFlag = match is null ? null : TeamDisplay.GetFlagUrl(match.AwayTeam);
+                    }
+                    @if (match is null)
+                    {
+                        <strong>@audit.Summary</strong>
+                    }
+                    else
+                    {
+                        <strong class="team-line">
+                            <span class="team-label">
+                                @if (homeFlag is not null)
+                                {
+                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                            </span>
+                            <span>@match.Result?.HomeGoals x @match.Result?.AwayGoals</span>
+                            <span class="team-label">
+                                @if (awayFlag is not null)
+                                {
+                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                            </span>
+                        </strong>
+                    }
                     <span>@audit.RegisteredBy - @audit.RegisteredAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
                 </div>
             </article>

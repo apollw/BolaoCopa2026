@@ -62,10 +62,29 @@
                 var homeValue = prediction is null ? string.Empty : prediction.HomeGoals.ToString();
                 var awayValue = prediction is null ? string.Empty : prediction.AwayGoals.ToString();
                 var rowIsEditable = item.CanEdit;
+                var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+                var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
 
                 <article class="prediction-row" data-kickoff-utc="@match.Kickoff.ToUniversalTime().ToString("O")" data-row-editable="@rowIsEditable.ToString().ToLowerInvariant()">
                     <div>
-                        <strong>@match.OfficialNumber. @match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                        <strong class="team-line">
+                            <span>@match.OfficialNumber.</span>
+                            <span class="team-label">
+                                @if (homeFlag is not null)
+                                {
+                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                            </span>
+                            <span class="team-vs">x</span>
+                            <span class="team-label">
+                                @if (awayFlag is not null)
+                                {
+                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                            </span>
+                        </strong>
                         <span>@(match.GroupName ?? match.Phase.ToString()) - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
                         @if (prediction is not null)
                         {
@@ -90,8 +109,8 @@
                         {
                             <select name="Drafts[@index].QualifiedTeamCode" aria-label="Classificado" disabled="@(!rowIsEditable)">
                                 <option value="">Classificado</option>
-                                <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@match.HomeTeam.Name</option>
-                                <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@match.AwayTeam.Name</option>
+                                <option value="@match.HomeTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.HomeTeam.Code)">@TeamDisplay.GetName(match.HomeTeam)</option>
+                                <option value="@match.AwayTeam.Code" selected="@(prediction?.QualifiedTeamCode == match.AwayTeam.Code)">@TeamDisplay.GetName(match.AwayTeam)</option>
                             </select>
                         }
                     </div>

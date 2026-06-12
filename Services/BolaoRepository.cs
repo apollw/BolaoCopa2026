@@ -123,12 +123,15 @@ public sealed class BolaoRepository
                                 return new PublicMatchPredictionLine
                                 {
                                     OfficialNumber = match.OfficialNumber,
-                                    HomeTeam = match.HomeTeam.Name,
-                                    AwayTeam = match.AwayTeam.Name,
+                                    HomeTeamCode = match.HomeTeam.Code,
+                                    HomeTeamName = match.HomeTeam.Name,
+                                    AwayTeamCode = match.AwayTeam.Code,
+                                    AwayTeamName = match.AwayTeam.Name,
                                     Kickoff = match.Kickoff,
                                     HomeGoals = definitivePrediction?.HomeGoals,
                                     AwayGoals = definitivePrediction?.AwayGoals,
-                                    QualifiedTeam = definitivePrediction is null
+                                    QualifiedTeamCode = definitivePrediction?.QualifiedTeamCode,
+                                    QualifiedTeamName = definitivePrediction is null
                                         ? null
                                         : ResolveQualifiedTeam(match, definitivePrediction.QualifiedTeamCode),
                                     SubmittedAt = definitivePrediction?.SubmittedAt,

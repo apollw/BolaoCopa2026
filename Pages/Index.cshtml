@@ -78,9 +78,27 @@
         <div class="match-list">
             @foreach (var match in Model.Stats.UpcomingMatches)
             {
+                var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+                var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
                 <article class="match-row">
                     <div>
-                        <strong>@match.HomeTeam.Name x @match.AwayTeam.Name</strong>
+                        <strong class="team-line">
+                            <span class="team-label">
+                                @if (homeFlag is not null)
+                                {
+                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                            </span>
+                            <span class="team-vs">x</span>
+                            <span class="team-label">
+                                @if (awayFlag is not null)
+                                {
+                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                }
+                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                            </span>
+                        </strong>
                         <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
                     </div>
                     @if (match.IncludesBrazil)
@@ -124,8 +142,17 @@
                         <tbody>
                             @foreach (var entry in group.Entries)
                             {
+                                var teamFlag = TeamDisplay.GetFlagUrl(entry.Team);
                                 <tr>
-                                    <td>@entry.Team.Name</td>
+                                    <td>
+                                        <span class="team-label">
+                                            @if (teamFlag is not null)
+                                            {
+                                                <img class="team-flag" src="@teamFlag" alt="" loading="lazy" />
+                                            }
+                                            <span>@TeamDisplay.GetName(entry.Team)</span>
+                                        </span>
+                                    </td>
                                     <td>@entry.Played</td>
                                     <td><strong>@entry.Points</strong></td>
                                     <td>@entry.GoalDifference</td>
@@ -159,9 +186,27 @@
         }
         @foreach (var match in Model.Stats.CompletedMatches.Take(10))
         {
+            var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+            var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
             <article class="match-row">
                 <div>
-                    <strong>@match.HomeTeam.Name @match.Result?.HomeGoals x @match.Result?.AwayGoals @match.AwayTeam.Name</strong>
+                    <strong class="team-line">
+                        <span class="team-label">
+                            @if (homeFlag is not null)
+                            {
+                                <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                        </span>
+                        <span>@match.Result?.HomeGoals x @match.Result?.AwayGoals</span>
+                        <span class="team-label">
+                            @if (awayFlag is not null)
+                            {
+                                <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                            }
+                            <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                        </span>
+                    </strong>
                     <span>@(match.GroupName ?? match.Phase.ToString()) - jogo @match.OfficialNumber</span>
                 </div>
             </article>

@@ -218,6 +218,39 @@ a {
   line-height: 1.25;
 }
 
+.team-line {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-vs {
+  color: #607166;
+  font-weight: 700;
+}
+
+.team-label {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.team-label.inline {
+  gap: 6px;
+}
+
+.team-flag {
+  border: 1px solid #d4dfce;
+  border-radius: 3px;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 14px;
+  object-fit: cover;
+  width: 20px;
+}
+
 .pill {
   background: #f9e7a2;
   color: #604600;
