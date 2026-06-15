@@ -131,9 +131,12 @@ public sealed class DashboardStats
     public int KnockoutQualifiedHits { get; init; }
     public int BrazilHits { get; init; }
     public int TotalPoints { get; init; }
+    public required IReadOnlyList<DashboardHighlightCard> HighlightCards { get; init; }
 }
 
 public sealed record DashboardChartSlice(string Label, int Value, string Color);
+
+public sealed record DashboardHighlightCard(string Title, string Value, string Caption);
 
 public sealed class PublicPredictionsWallView
 {
@@ -253,6 +256,15 @@ public sealed class ResultAudit
     public required string Summary { get; init; }
 }
 
+public sealed class CopaMessage
+{
+    public int Id { get; init; }
+    public int ParticipantId { get; init; }
+    public required string Body { get; set; }
+    public string? MoodKey { get; set; }
+    public required DateTimeOffset CreatedAt { get; set; }
+}
+
 public sealed class GroupStanding
 {
     public required string GroupName { get; init; }
@@ -306,4 +318,34 @@ public sealed class PublicParticipantDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
+}
+
+public sealed class MessageBoardAuthor
+{
+    public int Id { get; init; }
+    public required string Name { get; init; }
+    public string? AvatarKey { get; init; }
+}
+
+public sealed class MessageBoardEntry
+{
+    public required int Id { get; init; }
+    public required MessageBoardAuthor Author { get; init; }
+    public required string Body { get; init; }
+    public string? MoodKey { get; init; }
+    public string? MoodLabel { get; init; }
+    public string? MoodEmoji { get; init; }
+    public bool CanDelete { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+}
+
+public sealed class MessageBoardView
+{
+    public required IReadOnlyList<MessageBoardEntry> Messages { get; init; }
+    public required int Page { get; init; }
+    public required int PageSize { get; init; }
+    public required int TotalMessages { get; init; }
+    public required int TotalPages { get; init; }
+    public bool HasPreviousPage => Page > 1;
+    public bool HasNextPage => Page < TotalPages;
 }

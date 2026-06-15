@@ -1,7 +1,9 @@
 @page
 @model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Painel";
+    var requestToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken ?? string.Empty;
     var leader = Model.Stats.Ranking.FirstOrDefault();
     var topPlayers = Model.Stats.Ranking.Take(3).ToList();
     var outcomeTotal = Model.Stats.PredictionOutcomeSlices.Sum(slice => slice.Value);
@@ -126,43 +128,22 @@
             </div>
         </article>
 
-        <article class="panel chart-card">
+        <article class="panel chart-card highlight-card">
             <div class="panel-heading">
                 <div>
-                    <h3>Taxa de acerto da maioria</h3>
-                    <span>exatos, resultado e erro</span>
+                    <h3>Destaques dos palpites</h3>
+                    <span>padroes que mais apareceram no bolao</span>
                 </div>
             </div>
-            <div class="chart-figure">
-                <div class="chart-ring" style="@Model.BuildChartStyle(Model.Stats.PredictionOutcomeSlices)">
-                    <span class="chart-ring-label">
-                        @Model.Stats.ExactScores
-                        <small>exatos</small>
-                    </span>
-                </div>
-                <div class="chart-legend">
-                    @{
-                        var exactPercent = outcomeTotal > 0 ? Math.Round(Model.Stats.ExactScores * 100d / outcomeTotal) : 0;
-                        var resultPercent = outcomeTotal > 0 ? Math.Round(Model.Stats.ResultHits * 100d / outcomeTotal) : 0;
-                        var missCount = Math.Max(outcomeTotal - Model.Stats.ExactScores - Model.Stats.ResultHits, 0);
-                        var missPercent = outcomeTotal > 0 ? Math.Round(missCount * 100d / outcomeTotal) : 0;
-                    }
-                    <div class="chart-legend-item">
-                        <span class="chart-legend-swatch" style="background:#176b52"></span>
-                        <span class="chart-legend-label">Exatos</span>
-                        <span class="chart-legend-value">@Model.Stats.ExactScores (@exactPercent%)</span>
-                    </div>
-                    <div class="chart-legend-item">
-                        <span class="chart-legend-swatch" style="background:#d5a928"></span>
-                        <span class="chart-legend-label">Resultado</span>
-                        <span class="chart-legend-value">@Model.Stats.ResultHits (@resultPercent%)</span>
-                    </div>
-                    <div class="chart-legend-item">
-                        <span class="chart-legend-swatch" style="background:#a33a2b"></span>
-                        <span class="chart-legend-label">Erros</span>
-                        <span class="chart-legend-value">@missCount (@missPercent%)</span>
-                    </div>
-                </div>
+            <div class="highlight-list">
+                @foreach (var item in Model.Stats.HighlightCards)
+                {
+                    <article class="highlight-item">
+                        <span class="highlight-title">@item.Title</span>
+                        <strong>@item.Value</strong>
+                        <small>@item.Caption</small>
+                    </article>
+                }
             </div>
         </article>
     </div>
@@ -194,6 +175,388 @@
         }
     </div>
 </section>
+
+<section class="panel message-board-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Mural de Mensagens</h2>
+            <span data-message-board-count>@Model.MessageBoard.TotalMessages mensagem(ns) - 5 por pagina</span>
+        </div>
+        <span class="pill">publico entre participantes</span>
+    </div>
+
+    @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("Admin"))
+    {
+        <form method="post"
+              asp-page-handler="AddMessage"
+              class="message-board-form"
+              data-skip-global-loading="true"
+              data-message-board-form>
+            <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
+            <label class="message-board-field">
+                <span>Nova mensagem</span>
+                <textarea asp-for="MessageInput.Message" maxlength="200" rows="3" placeholder="Escreva algo sobre a Copa..."></textarea>
+                <small>Limite de 200 caracteres.</small>
+            </label>
+            <div class="message-board-actions">
+                <label class="message-board-field compact">
+                    <span>Humor opcional</span>
+                    <select asp-for="MessageInput.MoodKey">
+                        <option value="">Sem humor</option>
+                        @foreach (var mood in MessageMoodCatalog.All)
+                        {
+                            <option value="@mood.Key">@mood.Emoji @mood.Label</option>
+                        }
+                    </select>
+                </label>
+                <button type="submit" class="btn-app">Publicar</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <div class="notice">Entre como participante para publicar mensagens no mural.</div>
+    }
+
+    <div class="message-board-list" data-message-board-list>
+        @if (Model.MessageBoard.Messages.Count == 0)
+        {
+            <div class="message-board-empty">Nenhuma mensagem publicada ainda.</div>
+        }
+        else
+        {
+            @foreach (var message in Model.MessageBoard.Messages)
+            {
+                var avatar = Model.GetParticipantAvatar(message.Author.AvatarKey);
+                <article class="message-card">
+                    <div class="message-card-header">
+                        <div class="message-author">
+                            <span class="participant-avatar avatar-sm">
+                                @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
+                                {
+                                    <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span>@avatar.Symbol</span>
+                                }
+                            </span>
+                            <div>
+                                <strong>@message.Author.Name</strong>
+                                <small>@message.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(message.MoodLabel))
+                        {
+                            <span class="message-mood">@message.MoodEmoji @message.MoodLabel</span>
+                        }
+                    </div>
+                    <p>@message.Body</p>
+                    @if (message.CanDelete)
+                    {
+                        <div class="message-card-actions">
+                            <form method="post"
+                                  asp-page-handler="DeleteMessage"
+                                  class="message-delete-form"
+                                  data-message-delete-form
+                                  data-skip-global-loading="true">
+                                <input type="hidden" name="messageId" value="@message.Id" />
+                                <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
+                                <button type="submit" class="btn-app danger message-delete-button">Excluir</button>
+                            </form>
+                        </div>
+                    }
+                </article>
+            }
+        }
+    </div>
+
+    <div class="message-board-pagination"
+         data-message-board-pagination
+         data-current-page="@Model.MessageBoard.Page"
+         data-total-pages="@Model.MessageBoard.TotalPages"
+         @(Model.MessageBoard.TotalPages <= 1 ? "hidden" : null)>
+        <a class="btn-app secondary @(Model.MessageBoard.HasPreviousPage ? null : "disabled")"
+           asp-page="/Index"
+           asp-route-messagesPage="@(Math.Max(Model.MessageBoard.Page - 1, 1))">
+            Anterior
+        </a>
+        <span>Página @Model.MessageBoard.Page de @Model.MessageBoard.TotalPages</span>
+        <a class="btn-app secondary @(Model.MessageBoard.HasNextPage ? null : "disabled")"
+           asp-page="/Index"
+           asp-route-messagesPage="@(Math.Min(Model.MessageBoard.Page + 1, Model.MessageBoard.TotalPages))">
+            Próxima
+        </a>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const form = document.querySelector('[data-message-board-form]');
+            const list = document.querySelector('[data-message-board-list]');
+            const count = document.querySelector('[data-message-board-count]');
+            const pagination = document.querySelector('[data-message-board-pagination]');
+            const requestToken = '@requestToken';
+
+            if (!list || !count) {
+                return;
+            }
+
+            const escapeHtml = value => String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+
+            const formatDate = value => new Intl.DateTimeFormat('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(new Date(value));
+
+            const avatarMarkup = avatarKey => {
+                const key = String(avatarKey ?? 'none').toLowerCase();
+                const avatarMap = {
+                    'flag-bra': { kind: 'team', src: 'https://flagcdn.com/w80/br.png' },
+                    'emoji-ball': { kind: 'emoji', symbol: '⚽' },
+                    'emoji-trophy': { kind: 'emoji', symbol: '🏆' },
+                    'emoji-whistle': { kind: 'emoji', symbol: '🪈' },
+                    'emoji-goal': { kind: 'emoji', symbol: '🥅' },
+                    'emoji-fire': { kind: 'emoji', symbol: '🔥' },
+                    'emoji-clap': { kind: 'emoji', symbol: '👏' },
+                    'emoji-shield': { kind: 'emoji', symbol: '🛡' },
+                    'emoji-star': { kind: 'emoji', symbol: '⭐' }
+                };
+
+                const avatar = avatarMap[key];
+                if (avatar?.kind === 'team') {
+                    return `<img src="${avatar.src}" alt="" loading="lazy" />`;
+                }
+
+                return `<span>${escapeHtml(avatar?.symbol ?? '👤')}</span>`;
+            };
+
+            const renderMood = entry => {
+                if (!entry.moodLabel) {
+                    return '';
+                }
+
+                return `<span class="message-mood">${escapeHtml(entry.moodEmoji ?? '')} ${escapeHtml(entry.moodLabel)}</span>`;
+            };
+
+            const renderCard = entry => `
+                <article class="message-card">
+                    <div class="message-card-header">
+                        <div class="message-author">
+                            <span class="participant-avatar avatar-sm">${avatarMarkup(entry.author.avatarKey)}</span>
+                            <div>
+                                <strong>${escapeHtml(entry.author.name)}</strong>
+                                <small>${formatDate(entry.createdAt)}</small>
+                            </div>
+                        </div>
+                        ${renderMood(entry)}
+                    </div>
+                    <p>${escapeHtml(entry.body)}</p>
+                    ${entry.canDelete ? `
+                        <div class="message-card-actions">
+                            <form method="post" action="?handler=DeleteMessage" class="message-delete-form" data-skip-global-loading="true" data-message-delete-form>
+                                <input type="hidden" name="__RequestVerificationToken" value="${escapeHtml(requestToken)}" />
+                                <input type="hidden" name="messageId" value="${entry.id}" />
+                                <input type="hidden" name="messagesPage" value="${pagination?.dataset.currentPage ?? '1'}" />
+                                <button type="submit" class="btn-app danger message-delete-button">Excluir</button>
+                            </form>
+                        </div>
+                    ` : ''}
+                </article>
+            `;
+
+            const updateCount = totalMessages => {
+                count.textContent = `${totalMessages} mensagem(ns) - 5 por pagina`;
+            };
+
+            const updatePagination = board => {
+                if (!pagination) {
+                    return;
+                }
+
+                const page = Number(board.page || 1);
+                const totalPages = Number(board.totalPages || 1);
+
+                pagination.dataset.currentPage = page;
+                pagination.dataset.totalPages = totalPages;
+                pagination.hidden = totalPages <= 1;
+                pagination.innerHTML = `
+                    <a class="btn-app secondary ${page > 1 ? '' : 'disabled'}" href="?messagesPage=${Math.max(page - 1, 1)}">Anterior</a>
+                    <span>Página ${page} de ${totalPages}</span>
+                    <a class="btn-app secondary ${page < totalPages ? '' : 'disabled'}" href="?messagesPage=${Math.min(page + 1, totalPages)}">Próxima</a>
+                `;
+            };
+
+            const buildBoardUrl = page => `?handler=MessageBoard&messagesPage=${Math.max(Number(page || 1), 1)}`;
+
+            const loadBoard = async (page, options = {}) => {
+                const targetPage = Math.max(Number(page || 1), 1);
+                const response = await fetch(buildBoardUrl(targetPage), {
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await readJsonResponse(response);
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Nao foi possivel carregar o mural.');
+                }
+
+                updateCount(data.board.totalMessages);
+                updatePagination(data.board);
+                renderBoardMessages(data.board.messages ?? []);
+
+                if (options.pushState !== false) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('messagesPage', String(data.board.page || targetPage));
+                    window.history.replaceState({}, '', url);
+                }
+
+                return data.board;
+            };
+
+            const clearEmptyState = () => {
+                const empty = list.querySelector('.message-board-empty');
+                if (empty) {
+                    empty.remove();
+                }
+            };
+
+            const readJsonResponse = async response => {
+                const text = await response.text();
+                if (!text.trim()) {
+                    throw new Error('A resposta do servidor veio vazia.');
+                }
+
+                try {
+                    return JSON.parse(text);
+                } catch {
+                    throw new Error('A resposta do servidor nao veio em formato esperado.');
+                }
+            };
+
+            const renderBoardMessages = messages => {
+                list.innerHTML = messages.map(renderCard).join('');
+                if (!messages.length) {
+                    list.innerHTML = '<div class="message-board-empty">Nenhuma mensagem publicada ainda.</div>';
+                }
+            };
+
+            document.addEventListener('submit', async event => {
+                const formTarget = event.target;
+                if (!(formTarget instanceof HTMLFormElement) || !formTarget.matches('[data-message-delete-form]')) {
+                    return;
+                }
+
+                const deleteForm = formTarget;
+
+                event.preventDefault();
+
+                if (!window.confirm('Excluir esta mensagem?')) {
+                    return;
+                }
+
+                const submitButton = deleteForm.querySelector('button[type="submit"]');
+                const payload = new FormData(deleteForm);
+
+                submitButton?.setAttribute('disabled', 'true');
+                window.appLoading?.show?.('Excluindo mensagem...');
+
+                try {
+                    const response = await fetch(deleteForm.action, {
+                        method: 'POST',
+                        body: payload,
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const data = await readJsonResponse(response).catch(() => null);
+                        throw new Error(data?.message || 'Nao foi possivel excluir a mensagem.');
+                    }
+
+                    const currentPage = pagination?.dataset.currentPage ?? deleteForm.querySelector('input[name="messagesPage"]')?.value ?? '1';
+                    await loadBoard(currentPage, { pushState: false });
+                } catch (error) {
+                    window.alert(error?.message || 'Nao foi possivel excluir a mensagem.');
+                } finally {
+                    submitButton?.removeAttribute('disabled');
+                    window.appLoading?.hide?.();
+                }
+            });
+
+            if (form) {
+                form.addEventListener('submit', async event => {
+                    event.preventDefault();
+
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    const payload = new FormData(form);
+
+                    submitButton?.setAttribute('disabled', 'true');
+                    window.appLoading?.show?.('Publicando mensagem...');
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            body: payload,
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        const data = await readJsonResponse(response);
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.message || 'Nao foi possivel publicar a mensagem.');
+                        }
+
+                        await loadBoard(1, { pushState: true });
+
+                        form.reset();
+                        form.querySelector('textarea')?.focus();
+                    } catch (error) {
+                        window.alert(error?.message || 'Nao foi possivel publicar a mensagem.');
+                    } finally {
+                        submitButton?.removeAttribute('disabled');
+                        window.appLoading?.hide?.();
+                    }
+                });
+            }
+
+            document.addEventListener('click', async event => {
+                const link = event.target instanceof Element ? event.target.closest('[data-message-board-pagination] a[href*="messagesPage="]') : null;
+                if (!link || !(link instanceof HTMLAnchorElement) || link.classList.contains('disabled')) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                try {
+                    const targetUrl = new URL(link.href, window.location.origin);
+                    const targetPage = targetUrl.searchParams.get('messagesPage') || '1';
+                    window.appLoading?.show?.('Carregando mensagens...');
+                    await loadBoard(targetPage, { pushState: true });
+                } catch (error) {
+                    window.alert(error?.message || 'Nao foi possivel carregar o mural.');
+                } finally {
+                    window.appLoading?.hide?.();
+                }
+            });
+        })();
+    </script>
+}
 
 <section class="content-grid">
     <div class="panel">

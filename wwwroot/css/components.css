@@ -120,6 +120,43 @@
   padding: 16px;
 }
 
+.highlight-card {
+  display: grid;
+  gap: 14px;
+}
+
+.highlight-list {
+  display: grid;
+  gap: 12px;
+}
+
+.highlight-item {
+  background: linear-gradient(180deg, #fbfdf9 0%, #f4f8f1 100%);
+  border: 1px solid #e1e9dc;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.highlight-title {
+  color: #607166;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.highlight-item strong {
+  color: #123d32;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.highlight-item small {
+  color: #607166;
+}
+
 .dashboard-players-grid {
   display: grid;
   gap: 14px;
