@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BolaoCopa2026;
 using BolaoCopa2026.Models;
 using BolaoCopa2026.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -23,6 +24,7 @@ public class EspeciaisModel : PageModel
     public SpecialPredictionInput Input { get; set; } = new();
 
     public SpecialPredictionView SpecialView { get; private set; } = default!;
+    public IReadOnlyList<TeamCatalogEntry> TeamOptions => TeamCatalog.All;
 
     public void OnGet()
     {
@@ -87,8 +89,8 @@ public class EspeciaisModel : PageModel
 
         Input = new SpecialPredictionInput
         {
-            Champion = SpecialView.Prediction.Champion,
-            RunnerUp = SpecialView.Prediction.RunnerUp,
+            Champion = TeamCatalog.ResolveCode(SpecialView.Prediction.Champion) ?? SpecialView.Prediction.Champion,
+            RunnerUp = TeamCatalog.ResolveCode(SpecialView.Prediction.RunnerUp) ?? SpecialView.Prediction.RunnerUp,
             TopScorer = SpecialView.Prediction.TopScorer,
             GoldenBall = SpecialView.Prediction.GoldenBall
         };

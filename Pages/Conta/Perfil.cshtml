@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model BolaoCopa2026.Pages.Conta.PerfilModel
 @{
     ViewData["Title"] = "Perfil";
@@ -9,9 +9,34 @@
     <h1>Perfil do Participante</h1>
 </section>
 
+@if (TempData["Status"] is string status)
+{
+    <div class="notice">@status</div>
+}
+
 <section class="profile-layout">
-    <article class="panel">
-        <h2>Acesso</h2>
+    <article class="panel profile-card">
+        <div class="profile-hero">
+            <div class="profile-avatar-preview">
+                @if (Model.CurrentAvatar is null || Model.CurrentAvatar.Key == "none")
+                {
+                    <span>👤</span>
+                }
+                else if (Model.CurrentAvatar.Kind == "team")
+                {
+                    <img src="@Model.CurrentAvatar.ImageUrl" alt="" loading="lazy" />
+                }
+                else
+                {
+                    <span>@Model.CurrentAvatar.Symbol</span>
+                }
+            </div>
+            <div>
+                <h2>@Model.Participant?.Name</h2>
+                <p>@(Model.CurrentAvatar?.Label ?? "Sem avatar selecionado")</p>
+            </div>
+        </div>
+
         <form class="stacked-form">
             <label>
                 Nome
@@ -25,15 +50,100 @@
                 Login
                 <input type="text" value="@Model.Participant?.Login" readonly />
             </label>
-            <label>
-                ID no banco
-                <input type="text" value="@Model.Participant?.Id" readonly />
-            </label>
         </form>
     </article>
 
-    <article class="panel muted-panel">
-        <h2>Comprovantes</h2>
-        <p>Quando uma rodada for finalizada, o comprovante em imagem fica disponivel na tela de palpites com os metadados do seu cadastro.</p>
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Escolher avatar</h2>
+            <span>defina a identidade visiva do seu perfil</span>
+        </div>
+
+        <form method="post" class="stacked-form avatar-picker-form">
+            <div class="avatar-picker-grid" role="radiogroup" aria-label="Escolha de avatar">
+                @foreach (var avatar in Model.AvatarOptions)
+                {
+                    var isSelected = string.Equals(Model.SelectedAvatarKey, avatar.Key, StringComparison.OrdinalIgnoreCase);
+                    <label class="avatar-option @(isSelected ? "active" : null)">
+                        <input type="radio"
+                               name="SelectedAvatarKey"
+                               value="@avatar.Key"
+                               checked="@isSelected"
+                               data-avatar-choice />
+                        <span class="avatar-option-visual">
+                            @if (avatar.Kind == "team")
+                            {
+                                <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="avatar-emoji">@avatar.Symbol</span>
+                            }
+                        </span>
+                        <span class="avatar-option-label">@avatar.Label</span>
+                    </label>
+                }
+            </div>
+
+            <div class="profile-avatar-summary">
+                <div class="profile-avatar-preview small" data-avatar-preview>
+                    @if (Model.CurrentAvatar is null || Model.CurrentAvatar.Key == "none")
+                    {
+                        <span>👤</span>
+                    }
+                    else if (Model.CurrentAvatar.Kind == "team")
+                    {
+                        <img src="@Model.CurrentAvatar.ImageUrl" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span>@Model.CurrentAvatar.Symbol</span>
+                    }
+                </div>
+                <div>
+                    <strong data-avatar-label>@(Model.CurrentAvatar?.Label ?? "Sem avatar selecionado")</strong>
+                    <small>O avatar escolhido aparece no seu perfil.</small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-app" asp-page-handler="SaveAvatar">Salvar avatar</button>
+            </div>
+        </form>
     </article>
 </section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const form = document.querySelector('.avatar-picker-form');
+            const preview = form?.querySelector('[data-avatar-preview]');
+            const label = form?.querySelector('[data-avatar-label]');
+
+            if (!form || !preview || !label) {
+                return;
+            }
+
+            const renderPreview = choice => {
+                const option = choice.closest('.avatar-option');
+                const visual = option?.querySelector('.avatar-option-visual');
+                const optionLabel = option?.querySelector('.avatar-option-label');
+
+                if (!visual || !optionLabel) {
+                    return;
+                }
+
+                preview.innerHTML = visual.innerHTML;
+                label.textContent = optionLabel.textContent ?? 'Sem avatar selecionado';
+            };
+
+            form.querySelectorAll('[data-avatar-choice]').forEach(choice => {
+                choice.addEventListener('change', () => renderPreview(choice));
+
+                if (choice.checked) {
+                    renderPreview(choice);
+                }
+            });
+        })();
+    </script>
+}
