@@ -54,6 +54,7 @@ public sealed class Participant
     public required string Email { get; set; }
     public required string Login { get; set; }
     public string? PasswordHash { get; set; }
+    public string? AvatarKey { get; set; }
     public bool IsAdmin { get; set; }
 }
 
@@ -118,11 +119,21 @@ public sealed class DashboardStats
     public required IReadOnlyList<GroupStanding> GroupStandings { get; init; }
     public required IReadOnlyList<Match> UpcomingMatches { get; init; }
     public required IReadOnlyList<Match> CompletedMatches { get; init; }
+    public required IReadOnlyList<DashboardChartSlice> PredictionOutcomeSlices { get; init; }
     public int TotalMatches { get; init; }
     public int CompletedCount { get; init; }
     public int BrazilMatchesCompleted { get; init; }
     public int GoalsScored { get; init; }
+    public int FinalizedPredictions { get; init; }
+    public int DraftPredictions { get; init; }
+    public int ExactScores { get; init; }
+    public int ResultHits { get; init; }
+    public int KnockoutQualifiedHits { get; init; }
+    public int BrazilHits { get; init; }
+    public int TotalPoints { get; init; }
 }
+
+public sealed record DashboardChartSlice(string Label, int Value, string Color);
 
 public sealed class PublicPredictionsWallView
 {
@@ -158,10 +169,11 @@ public sealed class PublicRoundPredictions
 
 public enum PublicPredictionOutcome
 {
-    PendingOfficialResult,
-    ExactScore,
-    ResultHit,
-    Miss
+    NoPrediction = 0,
+    PendingOfficialResult = 1,
+    ExactScore = 2,
+    ResultHit = 3,
+    Miss = 4
 }
 
 public sealed class PublicMatchPredictionLine
@@ -181,6 +193,7 @@ public sealed class PublicMatchPredictionLine
     public string OutcomeCssClass => Outcome.ToString().ToLowerInvariant();
     public string OutcomeLabel => Outcome switch
     {
+        PublicPredictionOutcome.NoPrediction => "Sem palpite",
         PublicPredictionOutcome.ExactScore => "Exato",
         PublicPredictionOutcome.ResultHit => "Resultado",
         PublicPredictionOutcome.Miss => "Erro",
@@ -192,7 +205,9 @@ public sealed class PublicMatchPredictionLine
 public sealed class PublicSpecialPredictionCard
 {
     public required string Champion { get; init; }
+    public string? ChampionCode { get; init; }
     public required string RunnerUp { get; init; }
+    public string? RunnerUpCode { get; init; }
     public required string TopScorer { get; init; }
     public required string GoldenBall { get; init; }
     public required DateTimeOffset SubmittedAt { get; init; }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using BolaoCopa2026;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
 using SkiaSharp;
@@ -148,8 +149,8 @@ public sealed class AuditImageService : IDisposable
             canvas.DrawText(TruncateText($"Participante: {snapshot.Participant.Name} | Email: {snapshot.Participant.Email}", bodyPaint, 1040), 64, 210, bodyPaint);
             canvas.DrawText(TruncateText($"Finalizado: {submittedAt} | Gerado: {FormatBrasilia(snapshot.GeneratedAt)} | Horario de Brasilia", metaPaint, 1040), 64, 242, metaPaint);
 
-            DrawSpecialRow(canvas, 310, "Campeao", snapshot.Prediction.Champion, labelPaint, valuePaint);
-            DrawSpecialRow(canvas, 364, "Vice-campeao", snapshot.Prediction.RunnerUp, labelPaint, valuePaint);
+            DrawSpecialRow(canvas, 310, "Campeao", TeamCatalog.ResolveName(snapshot.Prediction.Champion), labelPaint, valuePaint);
+            DrawSpecialRow(canvas, 364, "Vice-campeao", TeamCatalog.ResolveName(snapshot.Prediction.RunnerUp), labelPaint, valuePaint);
             DrawSpecialRow(canvas, 418, "Artilheiro", snapshot.Prediction.TopScorer, labelPaint, valuePaint);
             DrawSpecialRow(canvas, 472, "Bola de Ouro", snapshot.Prediction.GoldenBall, labelPaint, valuePaint);
 

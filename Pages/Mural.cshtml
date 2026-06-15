@@ -16,23 +16,23 @@
         <h2>Participantes</h2>
         <span>@Model.Wall.Participants.Count no mural</span>
     </div>
-    <div class="mural-filter-row" role="tablist" aria-label="Participantes do mural">
-        <button type="button" class="mural-chip active" data-participant-filter="all">Todos</button>
-        @foreach (var participant in Model.Wall.Participants)
-        {
-            <button type="button" class="mural-chip" data-participant-filter="@participant.Participant.Id">@participant.Participant.Name</button>
-        }
-    </div>
+    <label class="mural-select-label" for="participant-filter">
+        <span>Selecionar participante</span>
+        <select id="participant-filter" class="mural-select" aria-label="Participantes do mural">
+            <option value="all">Todos os participantes</option>
+            @foreach (var participant in Model.Wall.Participants)
+            {
+                <option value="@participant.Participant.Id">@participant.Participant.Name</option>
+            }
+        </select>
+    </label>
 </section>
 
 <section class="mural-grid">
     @foreach (var participant in Model.Wall.Participants)
     {
-        <article class="panel mural-participant-card" data-participant-card="@participant.Participant.Id">
-            <button type="button"
-                    class="mural-participant-toggle"
-                    data-participant-toggle="@participant.Participant.Id"
-                    aria-expanded="false">
+        <details class="panel mural-participant-card" data-participant-card="@participant.Participant.Id">
+            <summary class="mural-participant-toggle" data-participant-toggle="@participant.Participant.Id">
                 <div>
                     <h2>@participant.Participant.Name</h2>
                 </div>
@@ -44,15 +44,15 @@
                         <span>especiais enviados</span>
                     }
                 </div>
-            </button>
+            </summary>
 
-            <div class="mural-collapsible-content" data-participant-content="@participant.Participant.Id" hidden>
+            <div class="mural-collapsible-content" data-participant-content="@participant.Participant.Id">
                 <div class="mural-inline-status" data-participant-status="@participant.Participant.Id">
                     Clique para carregar os palpites deste participante.
                 </div>
                 <div class="mural-detail-host" data-participant-detail="@participant.Participant.Id"></div>
             </div>
-        </article>
+        </details>
     }
 </section>
 
@@ -60,10 +60,11 @@
     <script>
         (() => {
             const detailsUrl = '@detailsUrl';
-            const participantChips = document.querySelectorAll('[data-participant-filter]');
+            const participantFilter = document.getElementById('participant-filter');
             const participantCards = document.querySelectorAll('[data-participant-card]');
             const loadedDetails = new Map();
             const activeRequests = new Map();
+            const loadSequences = new Map();
 
             const escapeHtml = value => String(value ?? '')
                 .replaceAll('&', '&amp;')
@@ -92,7 +93,7 @@
                     CZE: 'cz',
                     ECU: 'ec',
                     EGY: 'eg',
-                    ENG: 'gb',
+                    ENG: 'gb-eng',
                     ESP: 'es',
                     FRA: 'fr',
                     GER: 'de',
@@ -114,7 +115,7 @@
                     POR: 'pt',
                     QAT: 'qa',
                     RSA: 'za',
-                    SCO: 'gb',
+                    SCO: 'gb-sct',
                     SEN: 'sn',
                     SUI: 'ch',
                     SWE: 'se',
@@ -142,27 +143,35 @@
 
             const outcomeLabel = outcome => {
                 switch (outcome) {
+                    case 0:
+                        return 'Sem palpite';
                     case 1:
-                        return 'Exato';
+                        return 'Aguardando resultado';
                     case 2:
-                        return 'Resultado';
+                        return 'Exato';
                     case 3:
+                        return 'Resultado';
+                    case 4:
                         return 'Erro';
                     default:
-                        return 'Aguardando resultado';
+                        return 'Sem palpite';
                 }
             };
 
             const outcomeCssClass = outcome => {
                 switch (outcome) {
+                    case 0:
+                        return 'noprediction';
                     case 1:
-                        return 'exactscore';
+                        return 'pendingofficialresult';
                     case 2:
-                        return 'resulthit';
+                        return 'exactscore';
                     case 3:
+                        return 'resulthit';
+                    case 4:
                         return 'miss';
                     default:
-                        return 'pendingofficialresult';
+                        return 'noprediction';
                 }
             };
 
@@ -206,8 +215,8 @@
                             </div>
                         ` : `
                             <div class="mural-score pending">
-                                <strong>Sem palpite definitivo</strong>
-                                <small>Aguardando definicao ou rodada em aberto</small>
+                                <strong>Sem palpite</strong>
+                                <small>Esse jogo nao possui palpite definitivo salvo.</small>
                             </div>
                         `}
                     </article>
@@ -230,6 +239,9 @@
                     return '';
                 }
 
+                const championFlag = teamFlag(specialPrediction.championCode);
+                const runnerFlag = teamFlag(specialPrediction.runnerUpCode);
+
                 return `
                     <section class="mural-round-panel" id="participant-${participantId}-special">
                         <div class="mural-round-meta">
@@ -239,11 +251,11 @@
                         <div class="special-grid mural-special-grid">
                             <article>
                                 <span>Campeao</span>
-                                <strong>${escapeHtml(specialPrediction.champion)}</strong>
+                                <strong class="special-team-inline">${championFlag ? `<img class="team-flag" src="${championFlag}" alt="" loading="lazy" />` : ''}${escapeHtml(specialPrediction.champion)}</strong>
                             </article>
                             <article>
                                 <span>Vice-campeao</span>
-                                <strong>${escapeHtml(specialPrediction.runnerUp)}</strong>
+                                <strong class="special-team-inline">${runnerFlag ? `<img class="team-flag" src="${runnerFlag}" alt="" loading="lazy" />` : ''}${escapeHtml(specialPrediction.runnerUp)}</strong>
                             </article>
                             <article>
                                 <span>Artilheiro</span>
@@ -259,22 +271,14 @@
             };
 
             const renderParticipantDetail = participant => {
-                const roundTabs = participant.rounds.map((round, index) => `
-                    <button type="button"
-                            class="mural-chip ${index === 0 ? 'active' : ''}"
-                            data-round-target="participant-${participant.participant.id}-round-${round.round.id}">
+                const roundOptions = participant.rounds.map((round, index) => `
+                    <option value="participant-${participant.participant.id}-round-${round.round.id}" ${index === 0 ? 'selected' : ''}>
                         ${escapeHtml(round.round.name)}
-                    </button>
+                    </option>
                 `).join('');
 
-                const specialTab = participant.specialPrediction
-                    ? `
-                        <button type="button"
-                                class="mural-chip"
-                                data-round-target="participant-${participant.participant.id}-special">
-                            Especiais
-                        </button>
-                    `
+                const specialOption = participant.specialPrediction
+                    ? `<option value="participant-${participant.participant.id}-special">Especiais</option>`
                     : '';
 
                 const roundPanels = participant.rounds
@@ -282,10 +286,13 @@
                     .join('');
 
                 return `
-                    <div class="mural-filter-row mural-round-tabs" role="tablist" aria-label="Rodadas de ${escapeHtml(participant.participant.name)}">
-                        ${roundTabs}
-                        ${specialTab}
-                    </div>
+                    <label class="mural-select-label mural-round-select" aria-label="Rodadas de ${escapeHtml(participant.participant.name)}">
+                        <span>Palpites de ${escapeHtml(participant.participant.name)}</span>
+                        <select class="mural-select" data-round-select>
+                            ${roundOptions}
+                            ${specialOption}
+                        </select>
+                    </label>
                     <div class="mural-panels">
                         ${roundPanels}
                         ${renderSpecialPanel(participant.participant.id, participant.specialPrediction)}
@@ -293,20 +300,21 @@
                 `;
             };
 
-            const bindRoundTabs = card => {
-                card.querySelectorAll('.mural-round-tabs').forEach(tabRow => {
-                    const buttons = tabRow.querySelectorAll('[data-round-target]');
-                    const panels = card.querySelectorAll('.mural-round-panel');
+            const bindRoundSelect = card => {
+                const select = card.querySelector('[data-round-select]');
+                const panels = card.querySelectorAll('.mural-round-panel');
 
-                    buttons.forEach(button => {
-                        button.addEventListener('click', () => {
-                            const target = button.dataset.roundTarget;
+                if (!select) {
+                    return;
+                }
 
-                            buttons.forEach(item => item.classList.toggle('active', item === button));
-                            panels.forEach(panel => panel.classList.toggle('active', panel.id === target));
-                        });
-                    });
-                });
+                const sync = () => {
+                    const target = select.value;
+                    panels.forEach(panel => panel.classList.toggle('active', panel.id === target));
+                };
+
+                select.addEventListener('change', sync);
+                sync();
             };
 
             const ensureParticipantLoaded = async participantId => {
@@ -343,7 +351,19 @@
                 return request;
             };
 
-            const setExpanded = async (participantId, shouldExpand) => {
+            const collapseParticipant = participantId => {
+                const card = document.querySelector(`[data-participant-card="${participantId}"]`);
+                const toggle = card?.querySelector(`[data-participant-toggle="${participantId}"]`);
+
+                if (!card || !toggle) {
+                    return;
+                }
+
+                card.open = false;
+                toggle.setAttribute('aria-expanded', 'false');
+            };
+
+            const expandParticipant = async participantId => {
                 const card = document.querySelector(`[data-participant-card="${participantId}"]`);
                 const toggle = card?.querySelector(`[data-participant-toggle="${participantId}"]`);
                 const content = card?.querySelector(`[data-participant-content="${participantId}"]`);
@@ -354,14 +374,11 @@
                     return;
                 }
 
-                if (!shouldExpand) {
-                    toggle.setAttribute('aria-expanded', 'false');
-                    content.hidden = true;
-                    return;
-                }
+                const nextSequence = (loadSequences.get(participantId) ?? 0) + 1;
+                loadSequences.set(participantId, nextSequence);
 
+                card.open = true;
                 toggle.setAttribute('aria-expanded', 'true');
-                content.hidden = false;
 
                 if (host.childElementCount > 0) {
                     return;
@@ -371,31 +388,55 @@
 
                 try {
                     const participant = await ensureParticipantLoaded(participantId);
+
+                    if (loadSequences.get(participantId) !== nextSequence || toggle.getAttribute('aria-expanded') !== 'true') {
+                        return;
+                    }
+
                     host.innerHTML = renderParticipantDetail(participant);
                     status.remove();
-                    bindRoundTabs(card);
+                    bindRoundSelect(card);
                 } catch (error) {
+                    if (loadSequences.get(participantId) !== nextSequence) {
+                        return;
+                    }
+
                     status.textContent = error.message ?? 'Nao foi possivel carregar os palpites agora.';
                 }
             };
 
-            participantChips.forEach(chip => {
-                chip.addEventListener('click', () => {
-                    const target = chip.dataset.participantFilter;
-
-                    participantChips.forEach(item => item.classList.toggle('active', item === chip));
-                    participantCards.forEach(card => {
-                        const shouldShow = target === 'all' || card.dataset.participantCard === target;
-                        card.hidden = !shouldShow;
-                    });
+            const applyParticipantFilter = target => {
+                participantCards.forEach(card => {
+                    const shouldShow = target === 'all' || card.dataset.participantCard === target;
+                    card.hidden = !shouldShow;
+                    if (!shouldShow) {
+                        card.open = false;
+                    }
                 });
+            };
+
+            participantFilter?.addEventListener('change', () => {
+                applyParticipantFilter(participantFilter.value);
             });
 
-            document.querySelectorAll('[data-participant-toggle]').forEach(button => {
-                button.addEventListener('click', async () => {
-                    const participantId = button.dataset.participantToggle;
-                    const isExpanded = button.getAttribute('aria-expanded') === 'true';
-                    await setExpanded(participantId, !isExpanded);
+            applyParticipantFilter(participantFilter?.value ?? 'all');
+
+            document.querySelectorAll('[data-participant-card]').forEach(card => {
+                const toggle = card.querySelector('[data-participant-toggle]');
+                if (!toggle) {
+                    return;
+                }
+
+                toggle.setAttribute('aria-expanded', card.open ? 'true' : 'false');
+
+                card.addEventListener('toggle', async () => {
+                    const participantId = toggle.dataset.participantToggle;
+                    if (card.open) {
+                        await expandParticipant(participantId);
+                        return;
+                    }
+
+                    collapseParticipant(participantId);
                 });
             });
         })();

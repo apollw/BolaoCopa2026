@@ -8,8 +8,13 @@
 
   .stats-grid,
   .special-grid,
-  .groups-grid {
+  .groups-grid,
+  .dashboard-players-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-figure {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -28,7 +33,9 @@
 
   .stats-grid,
   .special-grid,
-  .groups-grid {
+  .groups-grid,
+  .dashboard-players-grid,
+  .avatar-picker-grid {
     grid-template-columns: 1fr;
   }
 
@@ -45,6 +52,11 @@
     flex-direction: column;
   }
 
+  .panel-heading > a,
+  .panel-heading > .section-toggle {
+    align-self: flex-start;
+  }
+
   .score-form {
     justify-content: flex-start;
   }
@@ -54,7 +66,8 @@
   .action-buttons,
   .action-buttons form,
   .action-buttons button,
-  .mural-special-grid {
+  .mural-special-grid,
+  .special-team-pair {
     width: 100%;
   }
 
@@ -143,7 +156,30 @@
     flex-direction: column;
   }
 
+  .mural-select {
+    width: 100%;
+  }
+
+  .profile-hero,
+  .profile-avatar-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .special-team-pair {
+    grid-template-columns: 1fr;
+  }
+
   .mural-special-grid {
     grid-template-columns: 1fr;
+  }
+
+  .round-results-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-summary-grid {
+    margin-bottom: 12px;
   }
 }

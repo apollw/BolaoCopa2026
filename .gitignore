@@ -5,6 +5,7 @@ out/
 publish/
 artifacts/
 .artifacts/
+.buildcheck/
 
 # .NET local state
 .dotnet/

@@ -102,7 +102,35 @@
     window.appLoading = { show, hide };
     window.appDownloads = { downloadFile };
 
+    const syncCollapseButton = button => {
+        const targetId = button.dataset.collapseTarget;
+        const target = targetId ? document.getElementById(targetId) : null;
+        if (!target) {
+            return;
+        }
+
+        const expanded = !target.hidden;
+        button.setAttribute("aria-expanded", expanded ? "true" : "false");
+        button.textContent = expanded ? "−" : "+";
+    };
+
+    document.querySelectorAll("[data-collapse-target]").forEach(syncCollapseButton);
+
     document.addEventListener("click", (event) => {
+        const collapseButton = event.target.closest("[data-collapse-target]");
+        if (collapseButton) {
+            event.preventDefault();
+
+            const target = document.getElementById(collapseButton.dataset.collapseTarget);
+            if (!target) {
+                return;
+            }
+
+            target.hidden = !target.hidden;
+            syncCollapseButton(collapseButton);
+            return;
+        }
+
         const downloadTrigger = event.target.closest("[data-fetch-download-url]");
         if (downloadTrigger) {
             event.preventDefault();

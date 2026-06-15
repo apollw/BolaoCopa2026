@@ -1,8 +1,22 @@
-﻿@page
+@page
 @model IndexModel
 @{
     ViewData["Title"] = "Painel";
     var leader = Model.Stats.Ranking.FirstOrDefault();
+    var topPlayers = Model.Stats.Ranking.Take(3).ToList();
+    var outcomeTotal = Model.Stats.PredictionOutcomeSlices.Sum(slice => slice.Value);
+    var completedByRound = Model.Stats.Rounds
+        .Select(round => new
+        {
+            Round = round,
+            Matches = Model.Stats.CompletedMatches
+                .Where(match => match.RoundId == round.Id)
+                .OrderBy(match => match.Kickoff)
+                .ThenBy(match => match.OfficialNumber)
+                .ToList()
+        })
+        .Where(group => group.Matches.Count > 0)
+        .ToList();
 }
 
 <section class="page-hero">
@@ -12,7 +26,27 @@
     </div>
     <div class="hero-panel">
         <span>Lider atual</span>
-        <strong>@(leader?.Participant.Name ?? "Sem ranking")</strong>
+        @if (leader is not null)
+        {
+            var leaderAvatar = Model.GetParticipantAvatar(leader.Participant);
+            <strong class="ranking-name-with-avatar">
+                <span class="participant-avatar avatar-sm">
+                    @if (leaderAvatar.Kind == "team" && leaderAvatar.ImageUrl is not null)
+                    {
+                        <img src="@leaderAvatar.ImageUrl" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span>@leaderAvatar.Symbol</span>
+                    }
+                </span>
+                <span>@leader.Participant.Name</span>
+            </strong>
+        }
+        else
+        {
+            <strong>Sem ranking</strong>
+        }
         <small>@(leader?.Points ?? 0) pontos</small>
     </div>
 </section>
@@ -36,11 +70,138 @@
     </article>
 </section>
 
+<section class="panel dashboard-stats-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Estatisticas gerais</h2>
+            <span>visao consolidada da copa e dos jogadores</span>
+        </div>
+    </div>
+
+    <div class="stats-grid dashboard-summary-grid">
+        <article>
+            <span>Total de pontos</span>
+            <strong>@Model.Stats.TotalPoints</strong>
+        </article>
+        <article>
+            <span>Palpites definitivos</span>
+            <strong>@Model.Stats.FinalizedPredictions</strong>
+        </article>
+        <article>
+            <span>Rascunhos abertos</span>
+            <strong>@Model.Stats.DraftPredictions</strong>
+        </article>
+        <article>
+            <span>Acertos exatos</span>
+            <strong>@Model.Stats.ExactScores</strong>
+        </article>
+    </div>
+
+    <div class="dashboard-charts-grid">
+        <article class="panel chart-card">
+            <div class="panel-heading">
+                <div>
+                    <h3>Distribuicao dos palpites definitivos</h3>
+                    <span>@outcomeTotal palpites avaliados</span>
+                </div>
+            </div>
+            <div class="chart-figure">
+                <div class="chart-ring" style="@Model.BuildChartStyle(Model.Stats.PredictionOutcomeSlices)">
+                    <span class="chart-ring-label">
+                        @outcomeTotal
+                        <small>avaliados</small>
+                    </span>
+                </div>
+                <div class="chart-legend">
+                    @foreach (var slice in Model.Stats.PredictionOutcomeSlices)
+                    {
+                        var percent = outcomeTotal > 0 ? Math.Round(slice.Value * 100d / outcomeTotal) : 0;
+                        <div class="chart-legend-item">
+                            <span class="chart-legend-swatch" style="background:@slice.Color"></span>
+                            <span class="chart-legend-label">@slice.Label</span>
+                            <span class="chart-legend-value">@slice.Value (@percent%)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </article>
+
+        <article class="panel chart-card">
+            <div class="panel-heading">
+                <div>
+                    <h3>Taxa de acerto da maioria</h3>
+                    <span>exatos, resultado e erro</span>
+                </div>
+            </div>
+            <div class="chart-figure">
+                <div class="chart-ring" style="@Model.BuildChartStyle(Model.Stats.PredictionOutcomeSlices)">
+                    <span class="chart-ring-label">
+                        @Model.Stats.ExactScores
+                        <small>exatos</small>
+                    </span>
+                </div>
+                <div class="chart-legend">
+                    @{
+                        var exactPercent = outcomeTotal > 0 ? Math.Round(Model.Stats.ExactScores * 100d / outcomeTotal) : 0;
+                        var resultPercent = outcomeTotal > 0 ? Math.Round(Model.Stats.ResultHits * 100d / outcomeTotal) : 0;
+                        var missCount = Math.Max(outcomeTotal - Model.Stats.ExactScores - Model.Stats.ResultHits, 0);
+                        var missPercent = outcomeTotal > 0 ? Math.Round(missCount * 100d / outcomeTotal) : 0;
+                    }
+                    <div class="chart-legend-item">
+                        <span class="chart-legend-swatch" style="background:#176b52"></span>
+                        <span class="chart-legend-label">Exatos</span>
+                        <span class="chart-legend-value">@Model.Stats.ExactScores (@exactPercent%)</span>
+                    </div>
+                    <div class="chart-legend-item">
+                        <span class="chart-legend-swatch" style="background:#d5a928"></span>
+                        <span class="chart-legend-label">Resultado</span>
+                        <span class="chart-legend-value">@Model.Stats.ResultHits (@resultPercent%)</span>
+                    </div>
+                    <div class="chart-legend-item">
+                        <span class="chart-legend-swatch" style="background:#a33a2b"></span>
+                        <span class="chart-legend-label">Erros</span>
+                        <span class="chart-legend-value">@missCount (@missPercent%)</span>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <div class="dashboard-players-grid">
+        @for (var index = 0; index < topPlayers.Count; index++)
+        {
+            var entry = topPlayers[index];
+            var avatar = Model.GetParticipantAvatar(entry.Participant);
+            var playerClass = entry == leader ? "top-player gold" : "top-player";
+            <article class="@playerClass">
+                <span class="top-player-rank">#@(index + 1)</span>
+                <strong class="ranking-name-with-avatar">
+                    <span class="participant-avatar avatar-sm">
+                        @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
+                        {
+                            <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                        }
+                        else
+                        {
+                            <span>@avatar.Symbol</span>
+                        }
+                    </span>
+                    <span>@entry.Participant.Name</span>
+                </strong>
+                <small>@entry.Points pontos</small>
+                <span>@entry.ExactScores exatos - @entry.KnockoutQualifiedHits classif. - @entry.BrazilHits brasil</span>
+            </article>
+        }
+    </div>
+</section>
+
 <section class="content-grid">
     <div class="panel">
         <div class="panel-heading">
-            <h2>Ranking</h2>
-            <span>desempate aplicado</span>
+            <div>
+                <h2>Ranking</h2>
+                <span>desempate aplicado</span>
+            </div>
         </div>
         <div class="table-wrap">
             <table class="app-table app-table-stack">
@@ -57,6 +218,7 @@
                     @for (var index = 0; index < Model.Stats.Ranking.Count; index++)
                     {
                         var entry = Model.Stats.Ranking[index];
+                        var avatar = Model.GetParticipantAvatar(entry.Participant);
                         var placeClass = index switch
                         {
                             0 => "first-place",
@@ -69,7 +231,19 @@
                                 <span class="ranking-position @placeClass">#@(index + 1)</span>
                             </td>
                             <td data-label="Participante">
-                                <span class="ranking-name">@entry.Participant.Name</span>
+                                <span class="ranking-name ranking-name-with-avatar">
+                                    <span class="participant-avatar avatar-xs">
+                                        @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
+                                        {
+                                            <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                                        }
+                                        else
+                                        {
+                                            <span>@avatar.Symbol</span>
+                                        }
+                                    </span>
+                                    <span>@entry.Participant.Name</span>
+                                </span>
                             </td>
                             <td data-label="Pontos">
                                 <strong class="ranking-points">@entry.Points</strong>
@@ -85,119 +259,13 @@
 
     <div class="panel">
         <div class="panel-heading">
-            <h2>Proximos Jogos</h2>
+            <div>
+                <h2>Proximos Jogos</h2>
+                <span>@Model.Stats.UpcomingMatches.Count partidas</span>
+            </div>
             <a asp-page="/Palpites/Index">ver palpites</a>
         </div>
-        <div class="match-list">
-            @foreach (var match in Model.Stats.UpcomingMatches)
-            {
-                var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
-                var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
-                <article class="match-row">
-                    <div>
-                        <strong class="team-line">
-                            <span class="team-label">
-                                @if (homeFlag is not null)
-                                {
-                                    <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
-                                }
-                                <span>@TeamDisplay.GetName(match.HomeTeam)</span>
-                            </span>
-                            <span class="team-vs">x</span>
-                            <span class="team-label">
-                                @if (awayFlag is not null)
-                                {
-                                    <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
-                                }
-                                <span>@TeamDisplay.GetName(match.AwayTeam)</span>
-                            </span>
-                        </strong>
-                        <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
-                    </div>
-                    @if (match.IncludesBrazil)
-                    {
-                        <span class="pill">pontuacao dobrada</span>
-                    }
-                </article>
-            }
-        </div>
-    </div>
-</section>
-
-<section class="panel muted-panel">
-    <div class="panel-heading">
-        <h2>Mural de Palpites</h2>
-        <a asp-page="/Mural">abrir mural completo</a>
-    </div>
-    <p>Consulte os palpites definitivos de todos os participantes, inclusive os especiais, em uma tela dedicada por participante e por rodada.</p>
-</section>
-
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Classificacao dos Grupos</h2>
-        <span>calculada pelos resultados reais registrados</span>
-    </div>
-    <div class="groups-grid">
-        @foreach (var group in Model.Stats.GroupStandings)
-        {
-            <article class="group-table">
-                <h3>@group.GroupName</h3>
-                <div class="table-wrap">
-                    <table class="app-table app-table-stack compact-table">
-                        <thead>
-                            <tr>
-                                <th>Selecao</th>
-                                <th>J</th>
-                                <th>Pts</th>
-                                <th>SG</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var entry in group.Entries)
-                            {
-                                var teamFlag = TeamDisplay.GetFlagUrl(entry.Team);
-                                <tr>
-                                    <td data-label="Selecao">
-                                        <span class="team-label">
-                                            @if (teamFlag is not null)
-                                            {
-                                                <img class="team-flag" src="@teamFlag" alt="" loading="lazy" />
-                                            }
-                                            <span>@TeamDisplay.GetName(entry.Team)</span>
-                                        </span>
-                                    </td>
-                                    <td data-label="Jogos">@entry.Played</td>
-                                    <td data-label="Pontos"><strong>@entry.Points</strong></td>
-                                    <td data-label="Saldo">@entry.GoalDifference</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Resultados Reais</h2>
-        @if (User.IsInRole("Admin"))
-        {
-            <a asp-page="/Admin/Resultados">registrar resultado</a>
-        }
-    </div>
-    <div class="match-list">
-        @if (Model.Stats.CompletedMatches.Count == 0)
-        {
-            <article class="match-row">
-                <div>
-                    <strong>Nenhum resultado registrado ainda.</strong>
-                    <span>Quando o admin registrar placares oficiais, eles aparecerao aqui.</span>
-                </div>
-            </article>
-        }
-        @foreach (var match in Model.Stats.CompletedMatches.Take(10))
+        @foreach (var match in Model.Stats.UpcomingMatches)
         {
             var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
             var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
@@ -211,7 +279,7 @@
                             }
                             <span>@TeamDisplay.GetName(match.HomeTeam)</span>
                         </span>
-                        <span>@match.Result?.HomeGoals x @match.Result?.AwayGoals</span>
+                        <span class="team-vs">x</span>
                         <span class="team-label">
                             @if (awayFlag is not null)
                             {
@@ -220,10 +288,133 @@
                             <span>@TeamDisplay.GetName(match.AwayTeam)</span>
                         </span>
                     </strong>
-                    <span>@(match.GroupName ?? match.Phase.ToString()) - jogo @match.OfficialNumber</span>
+                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
                 </div>
+                @if (match.IncludesBrazil)
+                {
+                    <span class="pill">pontuacao dobrada</span>
+                }
             </article>
         }
     </div>
 </section>
 
+<section class="panel muted-panel">
+    <div class="panel-heading">
+        <h2>Mural de Palpites</h2>
+        <a asp-page="/Mural">abrir mural completo</a>
+    </div>
+    <p>Consulte os palpites definitivos de todos os participantes, inclusive os especiais, em uma tela dedicada por participante e por rodada.</p>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Classificacao dos Grupos</h2>
+            <span>calculada pelos resultados reais registrados</span>
+        </div>
+        <button type="button"
+                class="section-toggle"
+                data-collapse-target="groups-body"
+                aria-controls="groups-body"
+                aria-expanded="true"
+                aria-label="Recolher classificacao dos grupos">−</button>
+    </div>
+    <div id="groups-body" class="collapsible-body">
+        <div class="groups-grid">
+            @foreach (var group in Model.Stats.GroupStandings)
+            {
+                <article class="group-table">
+                    <h3>@group.GroupName</h3>
+                    <div class="table-wrap">
+                        <table class="app-table app-table-stack compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Selecao</th>
+                                    <th>J</th>
+                                    <th>Pts</th>
+                                    <th>SG</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in group.Entries)
+                                {
+                                    var teamFlag = TeamDisplay.GetFlagUrl(entry.Team);
+                                    <tr>
+                                        <td data-label="Selecao">
+                                            <span class="team-label">
+                                                @if (teamFlag is not null)
+                                                {
+                                                    <img class="team-flag" src="@teamFlag" alt="" loading="lazy" />
+                                                }
+                                                <span>@TeamDisplay.GetName(entry.Team)</span>
+                                            </span>
+                                        </td>
+                                        <td data-label="Jogos">@entry.Played</td>
+                                        <td data-label="Pontos"><strong>@entry.Points</strong></td>
+                                        <td data-label="Saldo">@entry.GoalDifference</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Resultados Reais</h2>
+            <span>@Model.Stats.CompletedMatches.Count resultados registrados</span>
+        </div>
+        <button type="button"
+                class="section-toggle"
+                data-collapse-target="results-body"
+                aria-controls="results-body"
+                aria-expanded="true"
+                aria-label="Recolher resultados reais">−</button>
+    </div>
+    <div id="results-body" class="collapsible-body">
+        @foreach (var roundGroup in completedByRound)
+        {
+            <details class="round-results-group">
+                <summary class="round-results-summary">
+                    <strong>@roundGroup.Round.Name</strong>
+                    <span>@roundGroup.Matches.Count jogo(s)</span>
+                </summary>
+                <div class="match-list">
+                    @foreach (var match in roundGroup.Matches)
+                    {
+                        var homeFlag = TeamDisplay.GetFlagUrl(match.HomeTeam);
+                        var awayFlag = TeamDisplay.GetFlagUrl(match.AwayTeam);
+                        <article class="match-row">
+                            <div>
+                                <strong class="team-line">
+                                    <span class="team-label">
+                                        @if (homeFlag is not null)
+                                        {
+                                            <img class="team-flag" src="@homeFlag" alt="" loading="lazy" />
+                                        }
+                                        <span>@TeamDisplay.GetName(match.HomeTeam)</span>
+                                    </span>
+                                    <span>@match.Result?.HomeGoals x @match.Result?.AwayGoals</span>
+                                    <span class="team-label">
+                                        @if (awayFlag is not null)
+                                        {
+                                            <img class="team-flag" src="@awayFlag" alt="" loading="lazy" />
+                                        }
+                                        <span>@TeamDisplay.GetName(match.AwayTeam)</span>
+                                    </span>
+                                </strong>
+                                <span>@(match.GroupName ?? match.Phase.ToString()) - jogo @match.OfficialNumber</span>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </details>
+        }
+    </div>
+</section>

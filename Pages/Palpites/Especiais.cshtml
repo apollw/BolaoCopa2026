@@ -35,16 +35,62 @@
         </div>
 
         <form method="post" class="stacked-form">
-            <label asp-for="Input.Champion">
-                Campeao
-                <input asp-for="Input.Champion" disabled="@disabled" />
-                <span asp-validation-for="Input.Champion"></span>
-            </label>
-            <label asp-for="Input.RunnerUp">
-                Vice-campeao
-                <input asp-for="Input.RunnerUp" disabled="@disabled" />
-                <span asp-validation-for="Input.RunnerUp"></span>
-            </label>
+            <div class="special-team-pair">
+                <label class="special-select-label" asp-for="Input.Champion">
+                    Campeao
+                    <select asp-for="Input.Champion" disabled="@disabled" data-team-select="champion">
+                        <option value="">Selecione um campeao</option>
+                        @if (!string.IsNullOrWhiteSpace(Model.Input.Champion) && TeamCatalog.Resolve(Model.Input.Champion) is null)
+                        {
+                            <option value="@Model.Input.Champion" selected>@Model.Input.Champion</option>
+                        }
+                        @foreach (var team in Model.TeamOptions)
+                        {
+                            <option value="@team.Code">@team.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Input.Champion"></span>
+                </label>
+                <div class="special-team-preview" data-team-preview="champion">
+                    @if (TeamCatalog.ResolveFlagUrl(Model.Input.Champion) is string championFlag)
+                    {
+                        <img src="@championFlag" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span class="special-team-fallback">🏆</span>
+                    }
+                    <strong>@TeamCatalog.ResolveName(Model.Input.Champion)</strong>
+                </div>
+            </div>
+            <div class="special-team-pair">
+                <label class="special-select-label" asp-for="Input.RunnerUp">
+                    Vice-campeao
+                    <select asp-for="Input.RunnerUp" disabled="@disabled" data-team-select="runnerUp">
+                        <option value="">Selecione um vice-campeao</option>
+                        @if (!string.IsNullOrWhiteSpace(Model.Input.RunnerUp) && TeamCatalog.Resolve(Model.Input.RunnerUp) is null)
+                        {
+                            <option value="@Model.Input.RunnerUp" selected>@Model.Input.RunnerUp</option>
+                        }
+                        @foreach (var team in Model.TeamOptions)
+                        {
+                            <option value="@team.Code">@team.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Input.RunnerUp"></span>
+                </label>
+                <div class="special-team-preview" data-team-preview="runnerUp">
+                    @if (TeamCatalog.ResolveFlagUrl(Model.Input.RunnerUp) is string runnerFlag)
+                    {
+                        <img src="@runnerFlag" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span class="special-team-fallback">🥈</span>
+                    }
+                    <strong>@TeamCatalog.ResolveName(Model.Input.RunnerUp)</strong>
+                </div>
+            </div>
             <label asp-for="Input.TopScorer">
                 Artilheiro
                 <input asp-for="Input.TopScorer" disabled="@disabled" />
@@ -87,4 +133,97 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const form = document.querySelector('.stacked-form');
+
+            if (!form) {
+                return;
+            }
+
+            const updatePreview = selectName => {
+                const select = form.querySelector(`[data-team-select="${selectName}"]`);
+                const preview = form.querySelector(`[data-team-preview="${selectName}"]`);
+                if (!select || !preview) {
+                    return;
+                }
+
+                const option = select.selectedOptions[0];
+                const label = option?.textContent?.trim() || 'Sem seleção';
+                const flagMap = {
+                    ARG: 'ar',
+                    AUS: 'au',
+                    AUT: 'at',
+                    BEL: 'be',
+                    BIH: 'ba',
+                    BRA: 'br',
+                    CAN: 'ca',
+                    CIV: 'ci',
+                    COD: 'cd',
+                    COL: 'co',
+                    CPV: 'cv',
+                    CRO: 'hr',
+                    CZE: 'cz',
+                    CUW: 'cw',
+                    ECU: 'ec',
+                    EGY: 'eg',
+                    ENG: 'gb-eng',
+                    ESP: 'es',
+                    FRA: 'fr',
+                    GER: 'de',
+                    GHA: 'gh',
+                    HAI: 'ht',
+                    IRN: 'ir',
+                    IRQ: 'iq',
+                    JOR: 'jo',
+                    JPN: 'jp',
+                    KOR: 'kr',
+                    KSA: 'sa',
+                    MAR: 'ma',
+                    MEX: 'mx',
+                    NED: 'nl',
+                    NOR: 'no',
+                    NZL: 'nz',
+                    PAN: 'pa',
+                    PAR: 'py',
+                    POR: 'pt',
+                    QAT: 'qa',
+                    RSA: 'za',
+                    SCO: 'gb-sct',
+                    SEN: 'sn',
+                    SUI: 'ch',
+                    SWE: 'se',
+                    TUN: 'tn',
+                    TUR: 'tr',
+                    URU: 'uy',
+                    USA: 'us',
+                    UZB: 'uz'
+                };
+
+                const code = String(select.value ?? '').trim().toUpperCase();
+                const flagCode = flagMap[code];
+                preview.innerHTML = flagCode
+                    ? `<img src="https://flagcdn.com/w80/${flagCode}.png" alt="" loading="lazy" />`
+                    : `<span class="special-team-fallback">${selectName === 'champion' ? '🏆' : '🥈'}</span>`;
+
+                const strong = preview.querySelector('strong');
+                if (strong) {
+                    strong.textContent = label || 'Sem seleção';
+                    return;
+                }
+
+                preview.insertAdjacentHTML('beforeend', `<strong>${label || 'Sem seleção'}</strong>`);
+            };
+
+            ['champion', 'runnerUp'].forEach(name => {
+                const select = form.querySelector(`[data-team-select="${name}"]`);
+                if (!select) {
+                    return;
+                }
+
+                select.addEventListener('change', () => updatePreview(name));
+                updatePreview(name);
+            });
+        })();
+    </script>
 }
