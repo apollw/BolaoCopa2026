@@ -1,32 +1,33 @@
-FROM ubuntu:24.04 AS build
+FROM debian:bookworm-slim AS build
 WORKDIR /src
-ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb \
-    && dpkg -i /tmp/packages-microsoft-prod.deb \
-    && rm /tmp/packages-microsoft-prod.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends dotnet-sdk-9.0 \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
+
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="${DOTNET_ROOT}:${PATH}"
+
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+    && chmod +x /tmp/dotnet-install.sh \
+    && /tmp/dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet --runtime aspnetcore \
+    && /tmp/dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet \
+    && rm /tmp/dotnet-install.sh
 
 COPY . .
 RUN dotnet publish BolaoCopa2026.csproj -c Release -o /app/publish
 
-FROM ubuntu:24.04 AS runtime
+FROM debian:bookworm-slim AS runtime
 WORKDIR /app
-ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb \
-    && dpkg -i /tmp/packages-microsoft-prod.deb \
-    && rm /tmp/packages-microsoft-prod.deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends aspnetcore-runtime-9.0 \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="${DOTNET_ROOT}:${PATH}"
+
+COPY --from=build /usr/share/dotnet /usr/share/dotnet
 COPY --from=build /app/publish ./
 
 ENV ASPNETCORE_ENVIRONMENT=Production
