@@ -1,9 +1,10 @@
 services:
   - type: web
     name: bolao-copa-2026
-    runtime: docker
+    runtime: dotnet
     plan: free
-    dockerfilePath: ./Dockerfile
+    buildCommand: dotnet publish BolaoCopa2026.csproj -c Release -o out
+    startCommand: dotnet out/BolaoCopa2026.dll
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
