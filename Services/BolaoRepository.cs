@@ -62,16 +62,21 @@ public sealed class BolaoRepository
         var completed = matches.Where(match => match.Result is not null).ToList();
         var predictions = _db.Predictions.ToList();
         var finalizedPredictions = predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
-        var finalScores = finalizedPredictions
+        var scoredPredictions = finalizedPredictions
             .Where(prediction => matchesById[prediction.MatchId].Result is not null)
-            .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
+            .Select(prediction => new
+            {
+                Prediction = prediction,
+                Score = _scoringService.Score(matchesById[prediction.MatchId], prediction)
+            })
             .ToList();
-        var exactScores = finalScores.Count(score => score.ExactScore);
-        var resultHits = finalScores.Count(score => score.ResultHit);
-        var qualifiedHits = finalScores.Count(score => score.QualifiedHit);
-        var brazilHits = finalScores.Count(score => score.BrazilHit);
+        var exactScores = scoredPredictions.Count(item => item.Score.ExactScore);
+        var resultHits = scoredPredictions.Count(item => item.Score.ResultHit);
+        var qualifiedHits = scoredPredictions.Count(item => item.Score.QualifiedHit);
+        var brazilHits = scoredPredictions.Count(item => item.Score.BrazilHit);
         var totalPoints = ranking.Sum(entry => entry.Points);
         var draftPredictions = predictions.Count(prediction => prediction.SubmittedAt is null);
+        var highlightCards = BuildHighlightCards(finalizedPredictions, scoredPredictions);
 
         return new DashboardStats
         {
@@ -80,7 +85,7 @@ public sealed class BolaoRepository
             GroupStandings = GetGroupStandings(),
             UpcomingMatches = matches.Where(match => match.Result is null).Take(8).ToList(),
             CompletedMatches = completed.OrderByDescending(match => match.Kickoff).ToList(),
-            PredictionOutcomeSlices = BuildOutcomeSlices(exactScores, resultHits, finalScores.Count - exactScores - resultHits),
+            PredictionOutcomeSlices = BuildOutcomeSlices(exactScores, resultHits, scoredPredictions.Count - exactScores - resultHits),
             TotalMatches = matches.Count,
             CompletedCount = completed.Count,
             BrazilMatchesCompleted = completed.Count(match => match.IncludesBrazil),
@@ -91,8 +96,158 @@ public sealed class BolaoRepository
             ResultHits = resultHits,
             KnockoutQualifiedHits = qualifiedHits,
             BrazilHits = brazilHits,
-            TotalPoints = totalPoints
+            TotalPoints = totalPoints,
+            HighlightCards = highlightCards
         };
+    }
+
+    public MessageBoardView GetMessageBoard(int page, int pageSize = 15, int? currentParticipantId = null, bool isAdmin = false)
+    {
+        AutoFinalizeStartedPredictionsAndRounds();
+
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        page = Math.Max(page, 1);
+
+        var totalMessages = _db.CopaMessages.Count();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalMessages / (double)pageSize));
+        page = Math.Min(page, totalPages);
+
+        var rows = (
+            from message in _db.CopaMessages
+            join participant in _db.Participants on message.ParticipantId equals participant.Id
+            orderby message.CreatedAt descending, message.Id descending
+            select new
+            {
+                message.Id,
+                message.Body,
+                message.MoodKey,
+                message.CreatedAt,
+                ParticipantId = participant.Id,
+                ParticipantName = participant.Name,
+                participant.AvatarKey
+            })
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new MessageBoardView
+        {
+            Messages = rows.Select(row =>
+            {
+                var mood = MessageMoodCatalog.Resolve(row.MoodKey);
+
+                return new MessageBoardEntry
+                {
+                    Id = row.Id,
+                    Author = new MessageBoardAuthor
+                    {
+                        Id = row.ParticipantId,
+                        Name = row.ParticipantName,
+                        AvatarKey = row.AvatarKey
+                    },
+                    Body = row.Body,
+                    MoodKey = row.MoodKey,
+                    MoodLabel = mood?.Label,
+                    MoodEmoji = mood?.Emoji,
+                    CanDelete = isAdmin || (currentParticipantId.HasValue && row.ParticipantId == currentParticipantId.Value),
+                    CreatedAt = row.CreatedAt
+                };
+            }).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalMessages = totalMessages,
+            TotalPages = totalPages
+        };
+    }
+
+    public bool AddMessage(int participantId, string body, string? moodKey, out string message, out MessageBoardEntry? createdEntry)
+    {
+        createdEntry = null;
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            message = "Participante nao encontrado.";
+            return false;
+        }
+
+        body = body.Trim();
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            message = "Escreva uma mensagem antes de publicar.";
+            return false;
+        }
+
+        if (body.Length > 200)
+        {
+            message = "A mensagem deve ter no maximo 200 caracteres.";
+            return false;
+        }
+
+        moodKey = MessageMoodCatalog.Resolve(moodKey)?.Key;
+
+        var now = DateTimeOffset.UtcNow;
+        var entity = new CopaMessage
+        {
+            ParticipantId = participantId,
+            Body = body,
+            MoodKey = moodKey,
+            CreatedAt = now
+        };
+        _db.CopaMessages.Add(entity);
+
+        _db.SaveChanges();
+        var mood = MessageMoodCatalog.Resolve(moodKey);
+        createdEntry = new MessageBoardEntry
+        {
+            Id = entity.Id,
+            Author = new MessageBoardAuthor
+            {
+                Id = participant.Id,
+                Name = participant.Name,
+                AvatarKey = participant.AvatarKey
+            },
+            Body = body,
+            MoodKey = moodKey,
+            MoodLabel = mood?.Label,
+            MoodEmoji = mood?.Emoji,
+            CanDelete = true,
+            CreatedAt = now
+        };
+        message = "Mensagem publicada no mural.";
+        return true;
+    }
+
+    public bool DeleteMessage(int messageId, int? participantId, bool isAdmin, out string message, out MessageBoardView? board, int page, int pageSize = 15)
+    {
+        board = null;
+        var entity = _db.CopaMessages.SingleOrDefault(item => item.Id == messageId);
+        if (entity is null)
+        {
+            message = "Mensagem nao encontrada.";
+            return false;
+        }
+
+        if (!isAdmin)
+        {
+            if (participantId is null)
+            {
+                message = "Entre como participante para excluir mensagens.";
+                return false;
+            }
+
+            if (entity.ParticipantId != participantId.Value)
+            {
+                message = "Voce so pode excluir suas proprias mensagens.";
+                return false;
+            }
+        }
+
+        _db.CopaMessages.Remove(entity);
+        _db.SaveChanges();
+
+        board = GetMessageBoard(page, pageSize, participantId, isAdmin);
+        message = "Mensagem excluida.";
+        return true;
     }
 
     public PublicPredictionsWallView GetPublicPredictionsWall()
@@ -1060,6 +1215,62 @@ public sealed class BolaoRepository
             new DashboardChartSlice("Exatos", exactScores, "#176b52"),
             new DashboardChartSlice("Resultado", resultHits, "#d5a928"),
             new DashboardChartSlice("Erros", misses, "#a33a2b")
+        ];
+    }
+
+    private static IReadOnlyList<DashboardHighlightCard> BuildHighlightCards(
+        IReadOnlyList<Prediction> finalizedPredictions,
+        IReadOnlyList<dynamic> scoredPredictions)
+    {
+        var mostRegistered = finalizedPredictions
+            .GroupBy(prediction => (prediction.HomeGoals, prediction.AwayGoals))
+            .Select(group => new
+            {
+                group.Key.HomeGoals,
+                group.Key.AwayGoals,
+                Count = group.Count()
+            })
+            .OrderByDescending(item => item.Count)
+            .ThenByDescending(item => item.HomeGoals + item.AwayGoals)
+            .ThenBy(item => item.HomeGoals)
+            .ThenBy(item => item.AwayGoals)
+            .FirstOrDefault();
+
+        var highestRegistered = finalizedPredictions
+            .OrderByDescending(prediction => prediction.HomeGoals + prediction.AwayGoals)
+            .ThenByDescending(prediction => prediction.HomeGoals)
+            .ThenByDescending(prediction => prediction.AwayGoals)
+            .FirstOrDefault();
+
+        var mostAccurate = scoredPredictions
+            .Where(item => item.Score.ExactScore)
+            .GroupBy(item => (item.Prediction.HomeGoals, item.Prediction.AwayGoals))
+            .Select(group => new
+            {
+                group.Key.HomeGoals,
+                group.Key.AwayGoals,
+                Count = group.Count()
+            })
+            .OrderByDescending(item => item.Count)
+            .ThenByDescending(item => item.HomeGoals + item.AwayGoals)
+            .ThenBy(item => item.HomeGoals)
+            .ThenBy(item => item.AwayGoals)
+            .FirstOrDefault();
+
+        return
+        [
+            new DashboardHighlightCard(
+                "Palpite mais registrado",
+                mostRegistered is null ? "-" : $"{mostRegistered.HomeGoals} x {mostRegistered.AwayGoals}",
+                mostRegistered is null ? "Sem palpites suficientes" : $"{mostRegistered.Count} registros iguais"),
+            new DashboardHighlightCard(
+                "Maior palpite registrado",
+                highestRegistered is null ? "-" : $"{highestRegistered.HomeGoals} x {highestRegistered.AwayGoals}",
+                highestRegistered is null ? "Sem palpites registrados" : $"Total de {highestRegistered.HomeGoals + highestRegistered.AwayGoals} gols previstos"),
+            new DashboardHighlightCard(
+                "Palpite mais acertado",
+                mostAccurate is null ? "-" : $"{mostAccurate.HomeGoals} x {mostAccurate.AwayGoals}",
+                mostAccurate is null ? "Ainda sem acertos exatos" : $"{mostAccurate.Count} acerto(s) exato(s)")
         ];
     }
 

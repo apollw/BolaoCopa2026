@@ -67,7 +67,9 @@
   .action-buttons form,
   .action-buttons button,
   .mural-special-grid,
-  .special-team-pair {
+  .special-team-pair,
+  .message-board-actions,
+  .message-board-pagination {
     width: 100%;
   }
 
@@ -168,6 +170,17 @@
 
   .special-team-pair {
     grid-template-columns: 1fr;
+  }
+
+  .message-card-header,
+  .message-board-pagination,
+  .message-board-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .message-board-field.compact {
+    max-width: none;
   }
 
   .mural-special-grid {

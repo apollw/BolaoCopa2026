@@ -17,6 +17,7 @@ public sealed class BolaoDbContext : DbContext
     public DbSet<RoundSubmission> RoundSubmissions => Set<RoundSubmission>();
     public DbSet<SpecialPrediction> SpecialPredictions => Set<SpecialPrediction>();
     public DbSet<ResultAudit> ResultAudits => Set<ResultAudit>();
+    public DbSet<CopaMessage> CopaMessages => Set<CopaMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +98,14 @@ public sealed class BolaoDbContext : DbContext
             entity.HasKey(audit => audit.Id);
             entity.Property(audit => audit.RegisteredBy).HasMaxLength(80);
             entity.Property(audit => audit.Summary).HasMaxLength(240);
+        });
+
+        modelBuilder.Entity<CopaMessage>(entity =>
+        {
+            entity.HasKey(message => message.Id);
+            entity.Property(message => message.Body).HasMaxLength(200);
+            entity.Property(message => message.MoodKey).HasMaxLength(24);
+            entity.Property(message => message.CreatedAt);
         });
     }
 }
