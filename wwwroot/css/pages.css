@@ -468,6 +468,141 @@
   border-radius: 999px;
 }
 
+.message-board-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.message-board-form {
+  display: grid;
+  gap: 12px;
+}
+
+.message-board-field {
+  display: grid;
+  gap: 8px;
+}
+
+.message-board-field > span {
+  color: #405248;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.message-board-field textarea,
+.message-board-field select {
+  border: 1px solid #cfdcc8;
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.message-board-field textarea {
+  resize: vertical;
+}
+
+.message-board-field small {
+  color: #607166;
+  font-size: 0.8rem;
+}
+
+.message-board-field.compact {
+  max-width: 320px;
+}
+
+.message-board-actions {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.message-board-list {
+  display: grid;
+  gap: 12px;
+}
+
+.message-card {
+  background: #fbfdf9;
+  border: 1px solid #e1e9dc;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.message-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.message-author {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.message-author strong {
+  color: #16382f;
+  display: block;
+  font-weight: 850;
+}
+
+.message-author small {
+  color: #607166;
+}
+
+.message-card p {
+  color: #31443a;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.message-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message-delete-button {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.message-mood {
+  align-items: center;
+  background: #eef3ea;
+  border-radius: 999px;
+  color: #405248;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 800;
+  gap: 6px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.message-board-pagination {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.message-board-pagination span {
+  color: #607166;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.btn-app.disabled {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
 .round-results-group {
   border: 1px solid #edf2e9;
   border-radius: 10px;

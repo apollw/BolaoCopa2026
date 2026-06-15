@@ -92,10 +92,6 @@ namespace BolaoCopa2026.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("AvatarKey")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
@@ -192,6 +188,34 @@ namespace BolaoCopa2026.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ResultAudits");
+                });
+
+            modelBuilder.Entity("BolaoCopa2026.Models.CopaMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("MoodKey")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<int>("ParticipantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CopaMessages");
                 });
 
             modelBuilder.Entity("BolaoCopa2026.Models.RoundSubmission", b =>
