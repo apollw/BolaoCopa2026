@@ -4,69 +4,72 @@ namespace BolaoCopa2026;
 
 public static class TeamDisplay
 {
-    private static readonly IReadOnlyDictionary<string, string> Iso2ByCode =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, string> FlagCodes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["ALG"] = "dz",
+        ["ARG"] = "ar",
+        ["AUS"] = "au",
+        ["AUT"] = "at",
+        ["BEL"] = "be",
+        ["BIH"] = "ba",
+        ["BRA"] = "br",
+        ["CAN"] = "ca",
+        ["CIV"] = "ci",
+        ["COD"] = "cd",
+        ["COL"] = "co",
+        ["CPV"] = "cv",
+        ["CRO"] = "hr",
+        ["CZE"] = "cz",
+        ["CUW"] = "cw",
+        ["ECU"] = "ec",
+        ["EGY"] = "eg",
+        ["ENG"] = "gb-eng",
+        ["ESP"] = "es",
+        ["FRA"] = "fr",
+        ["GER"] = "de",
+        ["GHA"] = "gh",
+        ["HAI"] = "ht",
+        ["IRN"] = "ir",
+        ["IRQ"] = "iq",
+        ["JOR"] = "jo",
+        ["JPN"] = "jp",
+        ["KOR"] = "kr",
+        ["KSA"] = "sa",
+        ["MAR"] = "ma",
+        ["MEX"] = "mx",
+        ["NED"] = "nl",
+        ["NOR"] = "no",
+        ["NZL"] = "nz",
+        ["PAN"] = "pa",
+        ["PAR"] = "py",
+        ["POR"] = "pt",
+        ["QAT"] = "qa",
+        ["RSA"] = "za",
+        ["SCO"] = "gb-sct",
+        ["SEN"] = "sn",
+        ["SUI"] = "ch",
+        ["SWE"] = "se",
+        ["TUN"] = "tn",
+        ["TUR"] = "tr",
+        ["URU"] = "uy",
+        ["USA"] = "us",
+        ["UZB"] = "uz"
+    };
+
+    public static string? GetFlagUrl(string? teamCodeOrName)
+    {
+        if (string.IsNullOrWhiteSpace(teamCodeOrName))
         {
-            ["ALG"] = "dz",
-            ["ARG"] = "ar",
-            ["AUS"] = "au",
-            ["AUT"] = "at",
-            ["BEL"] = "be",
-            ["BIH"] = "ba",
-            ["BRA"] = "br",
-            ["CAN"] = "ca",
-            ["COD"] = "cd",
-            ["COL"] = "co",
-            ["CPV"] = "cv",
-            ["CIV"] = "ci",
-            ["CRO"] = "hr",
-            ["CUW"] = "cw",
-            ["CZE"] = "cz",
-            ["ECU"] = "ec",
-            ["EGY"] = "eg",
-            ["ENG"] = "gb",
-            ["ESP"] = "es",
-            ["FRA"] = "fr",
-            ["GER"] = "de",
-            ["GHA"] = "gh",
-            ["HAI"] = "ht",
-            ["IRN"] = "ir",
-            ["IRQ"] = "iq",
-            ["JOR"] = "jo",
-            ["JPN"] = "jp",
-            ["KOR"] = "kr",
-            ["KSA"] = "sa",
-            ["MAR"] = "ma",
-            ["MEX"] = "mx",
-            ["NED"] = "nl",
-            ["NOR"] = "no",
-            ["NZL"] = "nz",
-            ["PAN"] = "pa",
-            ["PAR"] = "py",
-            ["POR"] = "pt",
-            ["QAT"] = "qa",
-            ["RSA"] = "za",
-            ["SCO"] = "gb",
-            ["SEN"] = "sn",
-            ["SUI"] = "ch",
-            ["SWE"] = "se",
-            ["TUN"] = "tn",
-            ["TUR"] = "tr",
-            ["URU"] = "uy",
-            ["USA"] = "us",
-            ["UZB"] = "uz"
-        };
+            return null;
+        }
 
-    public static string GetName(Team team)
-    {
-        return GetName(team.Code, team.Name);
-    }
+        var code = TeamCatalog.ResolveCode(teamCodeOrName);
+        if (code is null || !FlagCodes.TryGetValue(code, out var flagCode))
+        {
+            return null;
+        }
 
-    public static string GetName(string? code, string? name)
-    {
-        return string.IsNullOrWhiteSpace(name)
-            ? code?.Trim() ?? string.Empty
-            : name.Trim();
+        return $"https://flagcdn.com/w80/{flagCode}.png";
     }
 
     public static string? GetFlagUrl(Team team)
@@ -74,15 +77,13 @@ public static class TeamDisplay
         return GetFlagUrl(team.Code);
     }
 
-    public static string? GetFlagUrl(string? code)
+    public static string GetName(string? teamCodeOrName)
     {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return null;
-        }
+        return TeamCatalog.ResolveName(teamCodeOrName);
+    }
 
-        return Iso2ByCode.TryGetValue(code.Trim(), out var iso2)
-            ? $"https://flagcdn.com/w40/{iso2}.png"
-            : null;
+    public static string GetName(Team team)
+    {
+        return team.Name;
     }
 }

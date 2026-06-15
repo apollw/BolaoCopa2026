@@ -1,3 +1,4 @@
+using BolaoCopa2026;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
 using Microsoft.EntityFrameworkCore;
@@ -51,24 +52,46 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
+        var ranking = GetRanking();
         var matches = _db.Matches
             .ToList()
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
+        var matchesById = matches.ToDictionary(match => match.Id);
         var completed = matches.Where(match => match.Result is not null).ToList();
+        var predictions = _db.Predictions.ToList();
+        var finalizedPredictions = predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
+        var finalScores = finalizedPredictions
+            .Where(prediction => matchesById[prediction.MatchId].Result is not null)
+            .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
+            .ToList();
+        var exactScores = finalScores.Count(score => score.ExactScore);
+        var resultHits = finalScores.Count(score => score.ResultHit);
+        var qualifiedHits = finalScores.Count(score => score.QualifiedHit);
+        var brazilHits = finalScores.Count(score => score.BrazilHit);
+        var totalPoints = ranking.Sum(entry => entry.Points);
+        var draftPredictions = predictions.Count(prediction => prediction.SubmittedAt is null);
 
         return new DashboardStats
         {
-            Ranking = GetRanking(),
+            Ranking = ranking,
             Rounds = Rounds,
             GroupStandings = GetGroupStandings(),
             UpcomingMatches = matches.Where(match => match.Result is null).Take(8).ToList(),
             CompletedMatches = completed.OrderByDescending(match => match.Kickoff).ToList(),
+            PredictionOutcomeSlices = BuildOutcomeSlices(exactScores, resultHits, finalScores.Count - exactScores - resultHits),
             TotalMatches = matches.Count,
             CompletedCount = completed.Count,
             BrazilMatchesCompleted = completed.Count(match => match.IncludesBrazil),
-            GoalsScored = completed.Sum(match => match.Result!.HomeGoals + match.Result.AwayGoals)
+            GoalsScored = completed.Sum(match => match.Result!.HomeGoals + match.Result.AwayGoals),
+            FinalizedPredictions = finalizedPredictions.Count,
+            DraftPredictions = draftPredictions,
+            ExactScores = exactScores,
+            ResultHits = resultHits,
+            KnockoutQualifiedHits = qualifiedHits,
+            BrazilHits = brazilHits,
+            TotalPoints = totalPoints
         };
     }
 
@@ -198,8 +221,10 @@ public sealed class BolaoRepository
                 ? null
                 : new PublicSpecialPredictionCard
                 {
-                    Champion = specialPrediction.Champion,
-                    RunnerUp = specialPrediction.RunnerUp,
+                    Champion = TeamCatalog.ResolveName(specialPrediction.Champion),
+                    ChampionCode = TeamCatalog.ResolveCode(specialPrediction.Champion),
+                    RunnerUp = TeamCatalog.ResolveName(specialPrediction.RunnerUp),
+                    RunnerUpCode = TeamCatalog.ResolveCode(specialPrediction.RunnerUp),
                     TopScorer = specialPrediction.TopScorer,
                     GoldenBall = specialPrediction.GoldenBall,
                     SubmittedAt = specialPrediction.SubmittedAt!.Value
@@ -580,6 +605,21 @@ public sealed class BolaoRepository
         _db.SaveChanges();
     }
 
+    public bool SaveParticipantAvatar(int participantId, string? avatarKey, out string message)
+    {
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            message = "Participante nao encontrado.";
+            return false;
+        }
+
+        participant.AvatarKey = string.IsNullOrWhiteSpace(avatarKey) ? null : avatarKey.Trim();
+        _db.SaveChanges();
+        message = "Avatar do perfil atualizado.";
+        return true;
+    }
+
     public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
     {
         AutoFinalizeStartedPredictionsAndRounds();
@@ -955,7 +995,12 @@ public sealed class BolaoRepository
 
     private static PublicPredictionOutcome ResolvePublicPredictionOutcome(Match match, Prediction? prediction)
     {
-        if (prediction?.SubmittedAt is null || match.Result is null)
+        if (prediction is null || prediction.SubmittedAt is null)
+        {
+            return PublicPredictionOutcome.NoPrediction;
+        }
+
+        if (match.Result is null)
         {
             return PublicPredictionOutcome.PendingOfficialResult;
         }
@@ -1006,6 +1051,16 @@ public sealed class BolaoRepository
         }
 
         entry.Losses++;
+    }
+
+    private static IReadOnlyList<DashboardChartSlice> BuildOutcomeSlices(int exactScores, int resultHits, int misses)
+    {
+        return
+        [
+            new DashboardChartSlice("Exatos", exactScores, "#176b52"),
+            new DashboardChartSlice("Resultado", resultHits, "#d5a928"),
+            new DashboardChartSlice("Erros", misses, "#a33a2b")
+        ];
     }
 
     private bool AreAllGroupStageResultsRegistered()

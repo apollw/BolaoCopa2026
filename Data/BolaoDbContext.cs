@@ -63,6 +63,7 @@ public sealed class BolaoDbContext : DbContext
             entity.Property(participant => participant.Email).HasMaxLength(180);
             entity.Property(participant => participant.Login).HasMaxLength(80);
             entity.Property(participant => participant.PasswordHash).HasMaxLength(500);
+            entity.Property(participant => participant.AvatarKey).HasMaxLength(40);
         });
 
         modelBuilder.Entity<Prediction>(entity =>
