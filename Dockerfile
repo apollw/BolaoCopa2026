@@ -2,7 +2,7 @@ FROM debian:bookworm-slim AS build
 WORKDIR /src
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get install -y --no-install-recommends ca-certificates curl libicu72 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV DOTNET_ROOT=/usr/share/dotnet
@@ -21,7 +21,7 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates libicu72 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV DOTNET_ROOT=/usr/share/dotnet
