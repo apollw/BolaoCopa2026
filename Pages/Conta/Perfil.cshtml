@@ -115,13 +115,13 @@
     <article class="panel">
         <div class="panel-heading">
             <h2>Foto de perfil</h2>
-            <span>upload ou camera, com recorte automatico</span>
+            <span>upload da galeria ou camera, com recorte automatico</span>
         </div>
 
         <form method="post" enctype="multipart/form-data" class="stacked-form avatar-upload-form" asp-page-handler="UploadPhoto">
             <label>
                 Escolher imagem
-                <input type="file" name="AvatarPhoto" accept="image/*" capture="environment" data-avatar-photo-input />
+                <input type="file" name="AvatarPhoto" accept="image/*" data-avatar-photo-input />
             </label>
 
             <div class="profile-avatar-summary">
