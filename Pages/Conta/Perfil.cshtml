@@ -22,7 +22,7 @@
                 {
                     <span>👤</span>
                 }
-                else if (Model.CurrentAvatar.Kind == "team")
+                else if (Model.CurrentAvatar.ImageUrl is not null)
                 {
                     <img src="@Model.CurrentAvatar.ImageUrl" alt="" loading="lazy" />
                 }
@@ -71,7 +71,7 @@
                                checked="@isSelected"
                                data-avatar-choice />
                         <span class="avatar-option-visual">
-                            @if (avatar.Kind == "team")
+                            @if (avatar.ImageUrl is not null)
                             {
                                 <img src="@avatar.ImageUrl" alt="" loading="lazy" />
                             }
@@ -91,7 +91,7 @@
                     {
                         <span>👤</span>
                     }
-                    else if (Model.CurrentAvatar.Kind == "team")
+                    else if (Model.CurrentAvatar.ImageUrl is not null)
                     {
                         <img src="@Model.CurrentAvatar.ImageUrl" alt="" loading="lazy" />
                     }
@@ -111,6 +111,48 @@
             </div>
         </form>
     </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Foto de perfil</h2>
+            <span>upload ou camera, com recorte automatico</span>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="stacked-form avatar-upload-form" asp-page-handler="UploadPhoto">
+            <label>
+                Escolher imagem
+                <input type="file" name="AvatarPhoto" accept="image/*" capture="environment" data-avatar-photo-input />
+            </label>
+
+            <div class="profile-avatar-summary">
+                <div class="profile-avatar-preview small" data-photo-preview>
+                    @if (!string.IsNullOrWhiteSpace(Model.Participant?.AvatarImagePath))
+                    {
+                        <img src="@Model.Participant!.AvatarImagePath" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span>👤</span>
+                    }
+                </div>
+                <div>
+                    <strong data-photo-label>@(string.IsNullOrWhiteSpace(Model.Participant?.AvatarImagePath) ? "Sem foto enviada" : "Foto atual")</strong>
+                    <small>A imagem e cortada em formato quadrado e reduzida para tamanho padrao. A foto tem prioridade sobre o avatar escolhido.</small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-app">Enviar foto</button>
+            </div>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Participant?.AvatarImagePath))
+        {
+            <form method="post" asp-page-handler="ClearPhoto" class="form-actions">
+                <button type="submit" class="btn-app secondary">Remover foto</button>
+            </form>
+        }
+    </article>
 </section>
 
 @section Scripts {
@@ -119,6 +161,9 @@
             const form = document.querySelector('.avatar-picker-form');
             const preview = form?.querySelector('[data-avatar-preview]');
             const label = form?.querySelector('[data-avatar-label]');
+            const photoInput = document.querySelector('[data-avatar-photo-input]');
+            const photoPreview = document.querySelector('[data-photo-preview]');
+            const photoLabel = document.querySelector('[data-photo-label]');
 
             if (!form || !preview || !label) {
                 return;
@@ -144,6 +189,19 @@
                     renderPreview(choice);
                 }
             });
+
+            if (photoInput instanceof HTMLInputElement && photoPreview && photoLabel) {
+                photoInput.addEventListener('change', () => {
+                    const file = photoInput.files?.[0];
+                    if (!file) {
+                        return;
+                    }
+
+                    const imageUrl = URL.createObjectURL(file);
+                    photoPreview.innerHTML = `<img src="${imageUrl}" alt="" loading="lazy" />`;
+                    photoLabel.textContent = file.name;
+                });
+            }
         })();
     </script>
 }

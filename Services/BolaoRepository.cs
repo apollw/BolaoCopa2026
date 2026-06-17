@@ -124,7 +124,8 @@ public sealed class BolaoRepository
                 message.CreatedAt,
                 ParticipantId = participant.Id,
                 ParticipantName = participant.Name,
-                participant.AvatarKey
+                participant.AvatarKey,
+                participant.AvatarImagePath
             })
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -143,7 +144,8 @@ public sealed class BolaoRepository
                     {
                         Id = row.ParticipantId,
                         Name = row.ParticipantName,
-                        AvatarKey = row.AvatarKey
+                        AvatarKey = row.AvatarKey,
+                        AvatarImagePath = row.AvatarImagePath
                     },
                     Body = row.Body,
                     MoodKey = row.MoodKey,
@@ -204,7 +206,8 @@ public sealed class BolaoRepository
             {
                 Id = participant.Id,
                 Name = participant.Name,
-                AvatarKey = participant.AvatarKey
+                AvatarKey = participant.AvatarKey,
+                AvatarImagePath = participant.AvatarImagePath
             },
             Body = body,
             MoodKey = moodKey,
@@ -772,6 +775,21 @@ public sealed class BolaoRepository
         participant.AvatarKey = string.IsNullOrWhiteSpace(avatarKey) ? null : avatarKey.Trim();
         _db.SaveChanges();
         message = "Avatar do perfil atualizado.";
+        return true;
+    }
+
+    public bool SaveParticipantAvatarImage(int participantId, string? avatarImagePath, out string message)
+    {
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            message = "Participante nao encontrado.";
+            return false;
+        }
+
+        participant.AvatarImagePath = string.IsNullOrWhiteSpace(avatarImagePath) ? null : avatarImagePath.Trim();
+        _db.SaveChanges();
+        message = "Foto do perfil atualizada.";
         return true;
     }
 

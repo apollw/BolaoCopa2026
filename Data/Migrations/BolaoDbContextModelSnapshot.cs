@@ -83,6 +83,10 @@ namespace BolaoCopa2026.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("AvatarImagePath")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

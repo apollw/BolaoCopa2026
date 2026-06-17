@@ -11,6 +11,7 @@ public static class BolaoSeedData
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BolaoDbContext>();
 
+        EnsureParticipantAvatarImageColumn(db);
         db.Database.Migrate();
 
         if (db.Rounds.Any())
@@ -23,6 +24,14 @@ public static class BolaoSeedData
         db.Matches.AddRange(SeedMatches());
 
         db.SaveChanges();
+    }
+
+    private static void EnsureParticipantAvatarImageColumn(BolaoDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            ALTER TABLE "Participants"
+            ADD COLUMN IF NOT EXISTS "AvatarImagePath" character varying(240);
+            """);
     }
 
     private static void EnsureMissingMatches(BolaoDbContext db)

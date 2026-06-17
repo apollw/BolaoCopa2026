@@ -27,6 +27,15 @@ public static class ParticipantAvatarCatalog
 
     public static ParticipantAvatarVisual Resolve(Participant? participant)
     {
+        if (!string.IsNullOrWhiteSpace(participant?.AvatarImagePath))
+        {
+            return new ParticipantAvatarVisual(
+                "photo",
+                "Foto do perfil",
+                "photo",
+                ImageUrl: participant!.AvatarImagePath);
+        }
+
         return Resolve(participant?.AvatarKey);
     }
 }
