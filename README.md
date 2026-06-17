@@ -17,10 +17,10 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 - Comprovante de auditoria em PNG bloqueado enquanto a rodada nao estiver finalizada.
 - Area administrativa protegida por senha para registrar resultado oficial uma unica vez por partida.
 - Tabela inicial da Copa 2026 com fase de grupos e cruzamentos do mata-mata por posicao.
-- Mural publico com carregamento sob demanda por participante.
+- Mural publico de mensagens com publicacao, exclusao pelo proprio autor ou Admin e paginacao AJAX com 5 mensagens por pagina.
 - Interface responsiva para dispositivos moveis.
 - CSS separado por arquivos de base, layout, componentes, paginas e responsividade.
-- Deploy Docker preparado para Render.
+- Deploy preparado para Render com Docker customizado, sem dependencia de `mcr.microsoft.com`.
 
 ## Como rodar
 
@@ -100,7 +100,7 @@ DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF
 
 ## Deploy Online Rapido
 
-O projeto esta preparado para deploy Docker no Render usando `Dockerfile` e `render.yaml`.
+O projeto esta preparado para deploy no Render usando `Dockerfile` customizado e `render.yaml`.
 
 Passos:
 
@@ -110,7 +110,9 @@ Passos:
 4. Configure a variavel secreta `SUPABASE_DATABASE_URL` com a URL real do Supabase.
 5. Confirme o deploy.
 
-As demais variaveis ficam em `render.yaml`: `ASPNETCORE_URLS=http://0.0.0.0:10000`.
+O `Dockerfile` atual usa `debian:bookworm-slim`, instala o .NET com `dotnet-install.sh` e adiciona `libicu`, evitando os erros que ocorriam ao puxar imagens do `mcr.microsoft.com`.
+
+As demais variaveis ficam em `render.yaml`: `ASPNETCORE_ENVIRONMENT=Production`, `ASPNETCORE_URLS=http://0.0.0.0:10000`.
 
 Variaveis recomendadas no Render:
 
