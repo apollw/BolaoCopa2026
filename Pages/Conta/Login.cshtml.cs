@@ -54,7 +54,7 @@ public class LoginModel : PageModel
         }
 
         await SignInAsync(participant);
-        return RedirectToPage("/Palpites/Index");
+        return RedirectToPage("/Index");
     }
 
     private async Task SignInAsync(Participant participant)
