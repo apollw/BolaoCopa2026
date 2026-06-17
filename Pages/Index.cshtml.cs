@@ -32,6 +32,16 @@ public class IndexModel : PageModel
         return ParticipantAvatarCatalog.Resolve(avatarKey);
     }
 
+    public ParticipantAvatarVisual GetParticipantAvatar(string? avatarKey, string? avatarImagePath)
+    {
+        if (!string.IsNullOrWhiteSpace(avatarImagePath))
+        {
+            return new ParticipantAvatarVisual("photo", "Foto do perfil", "photo", ImageUrl: avatarImagePath);
+        }
+
+        return ParticipantAvatarCatalog.Resolve(avatarKey);
+    }
+
     public int? CurrentParticipantId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var participantId)
         ? participantId
         : null;

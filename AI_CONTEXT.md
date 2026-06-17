@@ -8,6 +8,8 @@ Aplicacao web em ASP.NET Core Razor Pages para gerenciar o Bolao Premier AEW da 
 
 O sistema permite cadastro simples por email/senha, registro de palpites por rodada, finalizacao de rodadas, download de comprovante de auditoria em imagem, registro de resultados reais pelo admin, calculo automatico de ranking e exibicao de estatisticas/classificacao.
 
+O projeto usa exclusivamente PostgreSQL/Supabase em desenvolvimento e producao. Nao existe mais SQLite no fluxo principal.
+
 ## Stack
 
 - .NET 9
@@ -59,12 +61,13 @@ O `Program.cs` aceita `SUPABASE_DATABASE_URL` ou `DATABASE_URL` no formato URL d
 
 ## Deploy
 
-Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core Razor Pages com servidor Kestrel persistente. O projeto foi preparado para Render com Docker:
+Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core Razor Pages com servidor Kestrel persistente. O projeto foi preparado para Render com Docker customizado:
 
-- `Dockerfile` publica o app em Release e roda `BolaoCopa2026.dll`;
-- `render.yaml` cria web service free;
+- `Dockerfile` usa `debian:bookworm-slim`, instala o .NET com `dotnet-install.sh` e inclui `libicu`.
+- `render.yaml` define o servico web e a porta `10000`.
 - `SUPABASE_DATABASE_URL` deve ser configurada como segredo no painel do Render.
 - `Admin__Password` deve ser configurada no painel do Render para habilitar o acesso admin.
+- O deploy nao depende mais de imagens `mcr.microsoft.com`, que estavam gerando erro de pull no build.
 - Render gera URL publica `*.onrender.com`; no plano free pode dormir e demorar no primeiro acesso.
 
 ## Arquivos Principais
@@ -85,7 +88,7 @@ Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core 
 - `Pages/Mural.*`: mural publico de palpites com carregamento sob demanda por participante.
 - `wwwroot/css/site.css`: agregador de CSS.
 - `wwwroot/css/base.css`, `layout.css`, `components.css`, `pages.css`, `responsive.css`: estilos separados por responsabilidade.
-- `Dockerfile`, `.dockerignore`, `render.yaml`: deploy Docker no Render.
+- `Dockerfile`, `.dockerignore`, `render.yaml`: deploy no Render.
 
 ## Entidades e Conceitos
 
@@ -167,6 +170,8 @@ Campos:
 - `AuditProofHash`
 
 Esse registro e criado em `BolaoRepository.FinalizeRound(...)`. Ele e a fonte principal para saber se uma rodada foi finalizada pelo participante. Os `Predictions.SubmittedAt` continuam existindo como trava individual dos palpites.
+
+Rascunhos tambem podem virar definitivos automaticamente quando a partida comeca, mesmo que o participante nao finalize manualmente a rodada.
 
 ### ResultAudit
 
@@ -433,6 +438,15 @@ O mural publico nao renderiza mais todos os palpites de todos os usuarios na res
 - expande cada participante sob demanda;
 - busca os palpites completos via handler `OnGetParticipantDetails`;
 - mantem as abas internas por rodada somente apos carregar o detalhe.
+
+Na pagina principal existe tambem um mural de mensagens da Copa:
+
+- publicacao via AJAX sem recarregar a pagina inteira;
+- exclusao permitida ao autor e ao Admin;
+- paginação AJAX;
+- 5 mensagens por pagina;
+- limite de 200 caracteres por mensagem;
+- campo opcional de humor/status.
 
 Metodos principais:
 

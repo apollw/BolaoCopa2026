@@ -33,7 +33,7 @@
             var leaderAvatar = Model.GetParticipantAvatar(leader.Participant);
             <strong class="ranking-name-with-avatar">
                 <span class="participant-avatar avatar-sm">
-                    @if (leaderAvatar.Kind == "team" && leaderAvatar.ImageUrl is not null)
+                    @if (leaderAvatar.ImageUrl is not null)
                     {
                         <img src="@leaderAvatar.ImageUrl" alt="" loading="lazy" />
                     }
@@ -158,7 +158,7 @@
                 <span class="top-player-rank">#@(index + 1)</span>
                 <strong class="ranking-name-with-avatar">
                     <span class="participant-avatar avatar-sm">
-                        @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
+                        @if (avatar.ImageUrl is not null)
                         {
                             <img src="@avatar.ImageUrl" alt="" loading="lazy" />
                         }
@@ -182,111 +182,118 @@
             <h2>Mural de Mensagens</h2>
             <span data-message-board-count>@Model.MessageBoard.TotalMessages mensagem(ns) - 5 por pagina</span>
         </div>
-        <span class="pill">publico entre participantes</span>
+        <button type="button"
+                class="section-toggle"
+                data-collapse-target="message-board-body"
+                aria-controls="message-board-body"
+                aria-expanded="true"
+                aria-label="Recolher mural de mensagens">−</button>
     </div>
 
-    @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("Admin"))
-    {
-        <form method="post"
-              asp-page-handler="AddMessage"
-              class="message-board-form"
-              data-skip-global-loading="true"
-              data-message-board-form>
-            <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
-            <label class="message-board-field">
-                <span>Nova mensagem</span>
-                <textarea asp-for="MessageInput.Message" maxlength="200" rows="3" placeholder="Escreva algo sobre a Copa..."></textarea>
-                <small>Limite de 200 caracteres.</small>
-            </label>
-            <div class="message-board-actions">
-                <label class="message-board-field compact">
-                    <span>Humor opcional</span>
-                    <select asp-for="MessageInput.MoodKey">
-                        <option value="">Sem humor</option>
-                        @foreach (var mood in MessageMoodCatalog.All)
-                        {
-                            <option value="@mood.Key">@mood.Emoji @mood.Label</option>
-                        }
-                    </select>
-                </label>
-                <button type="submit" class="btn-app">Publicar</button>
-            </div>
-        </form>
-    }
-    else
-    {
-        <div class="notice">Entre como participante para publicar mensagens no mural.</div>
-    }
-
-    <div class="message-board-list" data-message-board-list>
-        @if (Model.MessageBoard.Messages.Count == 0)
+    <div id="message-board-body" class="collapsible-body">
+        @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("Admin"))
         {
-            <div class="message-board-empty">Nenhuma mensagem publicada ainda.</div>
+            <form method="post"
+                  asp-page-handler="AddMessage"
+                  class="message-board-form"
+                  data-skip-global-loading="true"
+                  data-message-board-form>
+                <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
+                <label class="message-board-field">
+                    <span>Nova mensagem</span>
+                    <textarea asp-for="MessageInput.Message" maxlength="200" rows="3" placeholder="Escreva algo sobre a Copa..."></textarea>
+                    <small>Limite de 200 caracteres.</small>
+                </label>
+                <div class="message-board-actions">
+                    <label class="message-board-field compact">
+                        <span>Humor opcional</span>
+                        <select asp-for="MessageInput.MoodKey">
+                            <option value="">Sem humor</option>
+                            @foreach (var mood in MessageMoodCatalog.All)
+                            {
+                                <option value="@mood.Key">@mood.Emoji @mood.Label</option>
+                            }
+                        </select>
+                    </label>
+                    <button type="submit" class="btn-app">Publicar</button>
+                </div>
+            </form>
         }
         else
         {
-            @foreach (var message in Model.MessageBoard.Messages)
-            {
-                var avatar = Model.GetParticipantAvatar(message.Author.AvatarKey);
-                <article class="message-card">
-                    <div class="message-card-header">
-                        <div class="message-author">
-                            <span class="participant-avatar avatar-sm">
-                                @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
-                                {
-                                    <img src="@avatar.ImageUrl" alt="" loading="lazy" />
-                                }
-                                else
-                                {
-                                    <span>@avatar.Symbol</span>
-                                }
-                            </span>
-                            <div>
-                                <strong>@message.Author.Name</strong>
-                                <small>@message.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
-                            </div>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(message.MoodLabel))
-                        {
-                            <span class="message-mood">@message.MoodEmoji @message.MoodLabel</span>
-                        }
-                    </div>
-                    <p>@message.Body</p>
-                    @if (message.CanDelete)
-                    {
-                        <div class="message-card-actions">
-                            <form method="post"
-                                  asp-page-handler="DeleteMessage"
-                                  class="message-delete-form"
-                                  data-message-delete-form
-                                  data-skip-global-loading="true">
-                                <input type="hidden" name="messageId" value="@message.Id" />
-                                <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
-                                <button type="submit" class="btn-app danger message-delete-button">Excluir</button>
-                            </form>
-                        </div>
-                    }
-                </article>
-            }
+            <div class="notice">Entre como participante para publicar mensagens no mural.</div>
         }
-    </div>
 
-    <div class="message-board-pagination"
-         data-message-board-pagination
-         data-current-page="@Model.MessageBoard.Page"
-         data-total-pages="@Model.MessageBoard.TotalPages"
-         @(Model.MessageBoard.TotalPages <= 1 ? "hidden" : null)>
-        <a class="btn-app secondary @(Model.MessageBoard.HasPreviousPage ? null : "disabled")"
-           asp-page="/Index"
-           asp-route-messagesPage="@(Math.Max(Model.MessageBoard.Page - 1, 1))">
-            Anterior
-        </a>
-        <span>Página @Model.MessageBoard.Page de @Model.MessageBoard.TotalPages</span>
-        <a class="btn-app secondary @(Model.MessageBoard.HasNextPage ? null : "disabled")"
-           asp-page="/Index"
-           asp-route-messagesPage="@(Math.Min(Model.MessageBoard.Page + 1, Model.MessageBoard.TotalPages))">
-            Próxima
-        </a>
+        <div class="message-board-list" data-message-board-list>
+            @if (Model.MessageBoard.Messages.Count == 0)
+            {
+                <div class="message-board-empty">Nenhuma mensagem publicada ainda.</div>
+            }
+            else
+            {
+                @foreach (var message in Model.MessageBoard.Messages)
+                {
+                    var avatar = Model.GetParticipantAvatar(message.Author.AvatarKey, message.Author.AvatarImagePath);
+                <article class="message-card">
+                        <div class="message-card-header">
+                            <div class="message-author">
+                                <span class="participant-avatar avatar-sm">
+                                    @if (avatar.ImageUrl is not null)
+                                    {
+                                        <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <span>@avatar.Symbol</span>
+                                    }
+                                </span>
+                                <div>
+                                    <strong>@message.Author.Name</strong>
+                                    <small>@message.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(message.MoodLabel))
+                            {
+                                <span class="message-mood">@message.MoodEmoji @message.MoodLabel</span>
+                            }
+                        </div>
+                        <p>@message.Body</p>
+                        @if (message.CanDelete)
+                        {
+                            <div class="message-card-actions">
+                                <form method="post"
+                                      asp-page-handler="DeleteMessage"
+                                      class="message-delete-form"
+                                      data-message-delete-form
+                                      data-skip-global-loading="true">
+                                    <input type="hidden" name="messageId" value="@message.Id" />
+                                    <input type="hidden" name="messagesPage" value="@Model.MessageBoard.Page" />
+                                    <button type="submit" class="btn-app danger message-delete-button">Excluir</button>
+                                </form>
+                            </div>
+                        }
+                    </article>
+                }
+            }
+        </div>
+
+        <div class="message-board-pagination"
+             data-message-board-pagination
+             data-current-page="@Model.MessageBoard.Page"
+             data-total-pages="@Model.MessageBoard.TotalPages"
+             @(Model.MessageBoard.TotalPages <= 1 ? "hidden" : null)>
+            <a class="btn-app secondary @(Model.MessageBoard.HasPreviousPage ? null : "disabled")"
+               asp-page="/Index"
+               asp-route-messagesPage="@(Math.Max(Model.MessageBoard.Page - 1, 1))">
+                Anterior
+            </a>
+            <span>Página @Model.MessageBoard.Page de @Model.MessageBoard.TotalPages</span>
+            <a class="btn-app secondary @(Model.MessageBoard.HasNextPage ? null : "disabled")"
+               asp-page="/Index"
+               asp-route-messagesPage="@(Math.Min(Model.MessageBoard.Page + 1, Model.MessageBoard.TotalPages))">
+                Próxima
+            </a>
+        </div>
     </div>
 </section>
 
@@ -318,7 +325,11 @@
                 minute: '2-digit'
             }).format(new Date(value));
 
-            const avatarMarkup = avatarKey => {
+            const avatarMarkup = (avatarKey, avatarImagePath) => {
+                if (avatarImagePath) {
+                    return `<img src="${escapeHtml(avatarImagePath)}" alt="" loading="lazy" />`;
+                }
+
                 const key = String(avatarKey ?? 'none').toLowerCase();
                 const avatarMap = {
                     'flag-bra': { kind: 'team', src: 'https://flagcdn.com/w80/br.png' },
@@ -349,10 +360,10 @@
             };
 
             const renderCard = entry => `
-                <article class="message-card">
+                        <article class="message-card">
                     <div class="message-card-header">
                         <div class="message-author">
-                            <span class="participant-avatar avatar-sm">${avatarMarkup(entry.author.avatarKey)}</span>
+                            <span class="participant-avatar avatar-sm">${avatarMarkup(entry.author.avatarKey, entry.author.avatarImagePath)}</span>
                             <div>
                                 <strong>${escapeHtml(entry.author.name)}</strong>
                                 <small>${formatDate(entry.createdAt)}</small>
@@ -596,7 +607,7 @@
                             <td data-label="Participante">
                                 <span class="ranking-name ranking-name-with-avatar">
                                     <span class="participant-avatar avatar-xs">
-                                        @if (avatar.Kind == "team" && avatar.ImageUrl is not null)
+                                        @if (avatar.ImageUrl is not null)
                                         {
                                             <img src="@avatar.ImageUrl" alt="" loading="lazy" />
                                         }
@@ -660,14 +671,6 @@
             </article>
         }
     </div>
-</section>
-
-<section class="panel muted-panel">
-    <div class="panel-heading">
-        <h2>Mural de Palpites</h2>
-        <a asp-page="/Mural">abrir mural completo</a>
-    </div>
-    <p>Consulte os palpites definitivos de todos os participantes, inclusive os especiais, em uma tela dedicada por participante e por rodada.</p>
 </section>
 
 <section class="panel">

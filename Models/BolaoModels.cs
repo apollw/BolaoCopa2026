@@ -55,6 +55,7 @@ public sealed class Participant
     public required string Login { get; set; }
     public string? PasswordHash { get; set; }
     public string? AvatarKey { get; set; }
+    public string? AvatarImagePath { get; set; }
     public bool IsAdmin { get; set; }
 }
 
@@ -325,6 +326,7 @@ public sealed class MessageBoardAuthor
     public int Id { get; init; }
     public required string Name { get; init; }
     public string? AvatarKey { get; init; }
+    public string? AvatarImagePath { get; init; }
 }
 
 public sealed class MessageBoardEntry
