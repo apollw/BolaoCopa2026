@@ -221,6 +221,7 @@ public sealed class RoundPredictionView
 {
     public required PredictionRound Round { get; init; }
     public required IReadOnlyList<MatchPredictionView> Matches { get; init; }
+    public DateTimeOffset? DraftLockUtc { get; init; }
     public bool IsLocked { get; init; }
     public bool IsFinalized { get; init; }
     public int DraftCount { get; init; }

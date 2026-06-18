@@ -400,6 +400,7 @@ public sealed class BolaoRepository
         var selectedRound = rounds.SingleOrDefault(round => round.Id == roundId) ?? rounds.First();
         var isLocked = !IsRoundAvailable(participantId, selectedRound.Id, out var lockReason);
         var isFinalized = IsRoundFinalized(participantId, selectedRound.Id);
+        var draftLockUtc = GetRoundDraftLockTime(selectedRound.Id);
         var now = DateTimeOffset.UtcNow;
         var roundMatches = _db.Matches
             .Where(match => match.RoundId == selectedRound.Id)
@@ -421,7 +422,7 @@ public sealed class BolaoRepository
                     Match = match,
                     Prediction = participantPredictions.GetValueOrDefault(match.Id),
                     HasStarted = hasStarted,
-                    CanEdit = !isLocked && !isFinalized && !hasStarted
+                    CanEdit = !isLocked && !isFinalized
                 };
             })
             .ToList();
@@ -430,6 +431,7 @@ public sealed class BolaoRepository
         {
             Round = selectedRound,
             Matches = matches,
+            DraftLockUtc = draftLockUtc,
             IsLocked = isLocked,
             LockReason = lockReason,
             IsFinalized = isFinalized,
@@ -556,9 +558,9 @@ public sealed class BolaoRepository
             return false;
         }
 
-        if (HasMatchStarted(match))
+        if (IsRoundDraftLocked(match.RoundId, out var draftLockReason))
         {
-            message = "O horario oficial da partida ja iniciou. O palpite nao pode mais ser alterado.";
+            message = draftLockReason ?? "Os palpites desta rodada estao bloqueados.";
             return false;
         }
 
@@ -610,6 +612,12 @@ public sealed class BolaoRepository
             return false;
         }
 
+        if (IsRoundDraftLocked(roundId, out var draftLockReason))
+        {
+            message = draftLockReason ?? "Os palpites desta rodada estao bloqueados.";
+            return false;
+        }
+
         var now = DateTimeOffset.UtcNow;
         var roundMatches = _db.Matches
             .Where(match => match.RoundId == roundId)
@@ -627,12 +635,6 @@ public sealed class BolaoRepository
         {
             if (!roundMatches.TryGetValue(draft.MatchId, out var match))
             {
-                continue;
-            }
-
-            if (HasMatchStarted(match, now))
-            {
-                lockedCount++;
                 continue;
             }
 
@@ -798,6 +800,11 @@ public sealed class BolaoRepository
         AutoFinalizeStartedPredictionsAndRounds();
 
         reason = null;
+        if (IsRoundDraftLocked(roundId, out reason))
+        {
+            return false;
+        }
+
         if (roundId <= 1)
         {
             return true;
@@ -1153,6 +1160,36 @@ public sealed class BolaoRepository
     private static bool HasMatchStarted(Match match, DateTimeOffset? now = null)
     {
         return (now ?? DateTimeOffset.UtcNow) >= match.Kickoff.ToUniversalTime();
+    }
+
+    private DateTimeOffset? GetRoundDraftLockTime(int roundId)
+    {
+        var firstKickoff = _db.Matches
+            .Where(match => match.RoundId == roundId)
+            .OrderBy(match => match.Kickoff)
+            .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
+            .FirstOrDefault();
+
+        return firstKickoff?.AddHours(-1);
+    }
+
+    private bool IsRoundDraftLocked(int roundId, out string? reason, DateTimeOffset? now = null)
+    {
+        var lockTime = GetRoundDraftLockTime(roundId);
+        if (lockTime is null)
+        {
+            reason = null;
+            return false;
+        }
+
+        if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
+        {
+            reason = $"Os palpites desta rodada travaram 1h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            return true;
+        }
+
+        reason = null;
+        return false;
     }
 
     private static string? ResolveQualifiedTeam(Match match, string? qualifiedTeamCode)

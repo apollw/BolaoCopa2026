@@ -45,12 +45,21 @@
         <div class="notice">Voce ainda tem @Model.RoundView.MissingCount partida(s) sem palpite. Se finalizar agora, elas ficarao em branco e nao poderao mais ser preenchidas.</div>
     }
 
+    @if (!Model.RoundView.IsFinalized && Model.RoundView.DraftLockUtc is not null)
+    {
+        <div class="notice">Os rascunhos desta rodada travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), 1h antes da primeira partida oficial. Depois disso, nao sera mais possivel editar esta rodada.</div>
+    }
+
     @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
     {
         <div class="notice">@Model.RoundView.StartedWithoutPredictionCount partida(s) desta rodada ja comecaram sem palpite salvo. Esses jogos permanecerao sem palpite.</div>
     }
 
-    <form id="round-drafts-form" method="post" asp-page-handler="SaveAllDrafts">
+    <form id="round-drafts-form"
+          method="post"
+          asp-page-handler="SaveAllDrafts"
+          data-draft-lock-utc="@Model.RoundView.DraftLockUtc?.ToUniversalTime().ToString("O")"
+          data-round-editable="@((!Model.RoundView.IsLocked && !Model.RoundView.IsFinalized).ToString().ToLowerInvariant())">
         <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
 
         <div class="match-list">
@@ -125,7 +134,7 @@
         <h2>Fechamento da rodada</h2>
         <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
         <p>Os rascunhos sao salvos automaticamente alguns segundos apos cada alteracao. Se preferir, voce tambem pode salvar tudo manualmente.</p>
-        <p>Quando o horario oficial de uma partida chega, o rascunho ja salvo para aquele jogo vira definitivo automaticamente. Se nao houver palpite salvo, a partida fica em branco. Depois da finalizacao da rodada, nao sera mais possivel adicionar nem editar palpites.</p>
+        <p>A rodada trava 1h antes da primeira partida oficial. Depois desse prazo, nao sera mais possivel adicionar nem editar palpites. O que estiver salvo permanece como rascunho ate a finalizacao da rodada.</p>
         @if (!Model.RoundView.IsFinalized && !Model.RoundView.IsLocked)
         {
             <small id="draft-save-status" class="save-state">Autosave ativo. As alteracoes desta rodada serao salvas automaticamente.</small>
@@ -164,6 +173,8 @@
         (() => {
             const form = document.getElementById('round-drafts-form');
             const status = document.getElementById('draft-save-status');
+            const saveButton = document.querySelector('button[type="submit"][form="round-drafts-form"]');
+            const lockAtRaw = form?.dataset.draftLockUtc;
 
             if (!form || !status) {
                 return;
@@ -174,12 +185,77 @@
             let debounceTimer = null;
             let currentRequest = null;
             let hasPendingChanges = false;
+            let lockTimer = null;
 
             const setStatus = message => {
                 status.textContent = message;
             };
 
+            const lockRound = () => {
+                if (form.dataset.roundEditable === 'false') {
+                    return;
+                }
+
+                form.dataset.roundEditable = 'false';
+
+                for (const input of editableInputs) {
+                    input.disabled = true;
+                }
+
+                if (saveButton instanceof HTMLButtonElement) {
+                    saveButton.disabled = true;
+                }
+
+                setStatus('Esta rodada travou pelo horario oficial. Recarregue a pagina para ver os avisos atualizados.');
+            };
+
+            const ensureRoundOpen = () => {
+                if (!lockAtRaw) {
+                    return true;
+                }
+
+                const lockAt = Date.parse(lockAtRaw);
+                if (Number.isNaN(lockAt)) {
+                    return true;
+                }
+
+                if (Date.now() >= lockAt) {
+                    lockRound();
+                    return false;
+                }
+
+                return form.dataset.roundEditable !== 'false';
+            };
+
+            const scheduleRoundLock = () => {
+                if (!lockAtRaw) {
+                    return;
+                }
+
+                const lockAt = Date.parse(lockAtRaw);
+                if (Number.isNaN(lockAt)) {
+                    return;
+                }
+
+                const delay = Math.max(0, lockAt - Date.now());
+                if (lockTimer) {
+                    window.clearTimeout(lockTimer);
+                }
+
+                if (delay === 0) {
+                    lockRound();
+                    return;
+                }
+
+                lockTimer = window.setTimeout(lockRound, delay);
+            };
+
             const saveDrafts = async () => {
+                if (!ensureRoundOpen()) {
+                    hasPendingChanges = false;
+                    return;
+                }
+
                 if (!hasPendingChanges) {
                     return;
                 }
@@ -218,40 +294,29 @@
             };
 
             const scheduleSave = () => {
+                if (!ensureRoundOpen()) {
+                    return;
+                }
+
                 hasPendingChanges = true;
                 setStatus('Alteracoes detectadas. Salvando em instantes...');
                 window.clearTimeout(debounceTimer);
                 debounceTimer = window.setTimeout(saveDrafts, 800);
             };
 
+            form.addEventListener('submit', event => {
+                if (!ensureRoundOpen()) {
+                    event.preventDefault();
+                }
+            });
+
             for (const input of editableInputs) {
                 input.addEventListener('input', scheduleSave);
                 input.addEventListener('change', scheduleSave);
             }
 
-            const lockExpiredMatches = () => {
-                const now = Date.now();
-                const rows = form.querySelectorAll('[data-kickoff-utc][data-row-editable="true"]');
-
-                for (const row of rows) {
-                    const kickoff = Date.parse(row.dataset.kickoffUtc);
-                    if (Number.isNaN(kickoff) || now < kickoff) {
-                        continue;
-                    }
-
-                    row.dataset.rowEditable = 'false';
-                    row.querySelectorAll('input, select').forEach(element => {
-                        if (element.type !== 'hidden') {
-                            element.disabled = true;
-                        }
-                    });
-
-                    setStatus('Uma ou mais partidas acabaram de travar pelo horario oficial. Recarregue a pagina para atualizar os avisos da rodada.');
-                }
-            };
-
-            window.setInterval(lockExpiredMatches, 15000);
-            lockExpiredMatches();
+            scheduleRoundLock();
+            ensureRoundOpen();
         })();
     </script>
 }
