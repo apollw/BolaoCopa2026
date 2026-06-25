@@ -219,7 +219,7 @@ Mata-mata:
 - Placar exato: 5 pontos.
 - Acerto do resultado: 3 pontos.
 - Acerto do classificado: 2 pontos.
-- Maximo por partida: 7 pontos antes da dobra do Brasil.
+- Maximo por partida: 8 pontos antes da dobra do Brasil (5 + 3).
 
 Ranking:
 

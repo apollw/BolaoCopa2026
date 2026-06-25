@@ -1,6 +1,6 @@
 using BolaoCopa2026.Models;
 
-namespace BolaoCopa2026;
+namespace BolaoCopa2026.Catalogs;
 
 public static class TeamDisplay
 {

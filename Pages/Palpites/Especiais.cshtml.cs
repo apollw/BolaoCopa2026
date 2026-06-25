@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using BolaoCopa2026;
+using BolaoCopa2026.Catalogs;
 using BolaoCopa2026.Models;
 using BolaoCopa2026.Services;
 using Microsoft.AspNetCore.Authorization;

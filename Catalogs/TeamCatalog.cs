@@ -1,6 +1,6 @@
 using BolaoCopa2026.Models;
 
-namespace BolaoCopa2026;
+namespace BolaoCopa2026.Catalogs;
 
 public sealed record TeamCatalogEntry(string Code, string Name, bool IsBrazil = false);
 
