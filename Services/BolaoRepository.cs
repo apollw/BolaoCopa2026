@@ -258,8 +258,22 @@ public sealed class BolaoRepository
         AutoFinalizeStartedPredictionsAndRounds();
 
         var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
+        var matches = _db.Matches.ToList();
+        var matchesByRound = matches
+            .GroupBy(match => match.RoundId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var lockedRoundIds = matchesByRound
+            .Where(kvp => kvp.Value.Any(match => DateTimeOffset.UtcNow >= match.Kickoff.ToUniversalTime()))
+            .Select(kvp => kvp.Key)
+            .ToHashSet();
         var definitiveCounts = _db.Predictions
             .Where(prediction => prediction.SubmittedAt != null)
+            .AsEnumerable()
+            .Where(prediction => 
+            {
+                var match = matches.FirstOrDefault(m => m.Id == prediction.MatchId);
+                return match != null && lockedRoundIds.Contains(match.RoundId);
+            })
             .GroupBy(prediction => prediction.ParticipantId)
             .ToDictionary(
                 group => group.Key,
@@ -328,12 +342,13 @@ public sealed class BolaoRepository
             {
                 var roundMatches = matchesByRound.GetValueOrDefault(round.Id) ?? [];
                 participantSubmissions.TryGetValue(round.Id, out var submission);
+                var isRoundLocked = IsRoundLocked(round.Id);
 
                 var lines = roundMatches
                     .Select(match =>
                     {
                         participantPredictions.TryGetValue(match.Id, out var prediction);
-                        var definitivePrediction = prediction?.SubmittedAt is not null ? prediction : null;
+                        var definitivePrediction = (prediction?.SubmittedAt is not null && isRoundLocked) ? prediction : null;
 
                         return new PublicMatchPredictionLine
                         {
@@ -1170,7 +1185,7 @@ public sealed class BolaoRepository
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
             .FirstOrDefault();
 
-        return firstKickoff?.AddHours(-1);
+        return firstKickoff?.AddHours(-4);
     }
 
     private bool IsRoundDraftLocked(int roundId, out string? reason, DateTimeOffset? now = null)
@@ -1184,12 +1199,24 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites desta rodada travaram 1h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites desta rodada travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 
         reason = null;
         return false;
+    }
+
+    private bool IsRoundLocked(int roundId, DateTimeOffset? now = null)
+    {
+        var now_utc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        var firstKickoff = _db.Matches
+            .Where(match => match.RoundId == roundId)
+            .OrderBy(match => match.Kickoff)
+            .Select(match => match.Kickoff.ToUniversalTime())
+            .FirstOrDefault();
+
+        return firstKickoff != default && now_utc >= firstKickoff;
     }
 
     private static string? ResolveQualifiedTeam(Match match, string? qualifiedTeamCode)
