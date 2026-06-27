@@ -316,6 +316,13 @@ public sealed class SpecialAuditSnapshot
     public required string ProofHash { get; init; }
 }
 
+public sealed class FullAuditPackage
+{
+    public required Participant Participant { get; init; }
+    public required IReadOnlyList<AuditSnapshot> RoundSnapshots { get; init; }
+    public SpecialAuditSnapshot? SpecialSnapshot { get; init; }
+}
+
 public sealed class PublicParticipantDto
 {
     public int Id { get; set; }

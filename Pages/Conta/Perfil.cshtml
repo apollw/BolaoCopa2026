@@ -153,6 +153,24 @@
             </form>
         }
     </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Auditoria completa</h2>
+            <span>um PDF com todos os comprovantes disponiveis do seu perfil</span>
+        </div>
+
+        <p>O arquivo consolida os comprovantes de rodadas finalizadas e os palpites especiais finalizados do seu usuario.</p>
+
+        <div class="form-actions">
+            <button type="button"
+                    class="btn-app secondary"
+                    data-fetch-download-url="@Url.Page("/Conta/Perfil", "DownloadFullAudit")"
+                    data-loading-message="Gerando auditoria completa...">
+                Baixar auditoria completa
+            </button>
+        </div>
+    </article>
 </section>
 
 @section Scripts {

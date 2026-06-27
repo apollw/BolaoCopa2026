@@ -3,6 +3,7 @@ using System.Text;
 using BolaoCopa2026;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
+using Microsoft.EntityFrameworkCore;
 using SkiaSharp;
 
 namespace BolaoCopa2026.Services;
@@ -102,6 +103,56 @@ public sealed class AuditImageService : IDisposable
         submission.AuditDownloadedAt = snapshot.GeneratedAt;
         submission.AuditProofHash = snapshot.ProofHash;
         _db.SaveChanges();
+    }
+
+    public FullAuditPackage? BuildFullAuditPackage(int participantId)
+    {
+        var participant = _db.Participants.AsNoTracking().SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var roundSnapshots = _db.Rounds
+            .AsNoTracking()
+            .OrderBy(round => round.Id)
+            .AsEnumerable()
+            .Select(round => BuildSnapshot(participantId, round.Id))
+            .Where(snapshot => snapshot != null)
+            .Select(snapshot => snapshot!)
+            .ToList();
+        var specialSnapshot = BuildSpecialSnapshot(participantId);
+
+        if (!roundSnapshots.Any() && specialSnapshot is null)
+        {
+            return null;
+        }
+
+        return new FullAuditPackage
+        {
+            Participant = participant,
+            RoundSnapshots = roundSnapshots,
+            SpecialSnapshot = specialSnapshot
+        };
+    }
+
+    public byte[] RenderFullAuditPdf(FullAuditPackage package)
+    {
+        using var stream = new MemoryStream();
+        using var document = SKDocument.CreatePdf(stream);
+
+        foreach (var snapshot in package.RoundSnapshots)
+        {
+            AddPdfPage(document, RenderPng(snapshot));
+        }
+
+        if (package.SpecialSnapshot is not null)
+        {
+            AddPdfPage(document, RenderSpecialPng(package.SpecialSnapshot));
+        }
+
+        document.Close();
+        return stream.ToArray();
     }
 
     public SpecialAuditSnapshot? BuildSpecialSnapshot(int participantId)
@@ -268,6 +319,19 @@ public sealed class AuditImageService : IDisposable
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
+    }
+
+    private static void AddPdfPage(SKDocument document, byte[] imageBytes)
+    {
+        using var image = SKImage.FromEncodedData(imageBytes);
+        if (image is null)
+        {
+            return;
+        }
+
+        using var canvas = document.BeginPage(image.Width, image.Height);
+        canvas.DrawImage(image, 0, 0);
+        document.EndPage();
     }
 
     private static void DrawCard(SKCanvas canvas, int width, int height, float headerHeight)
