@@ -230,7 +230,7 @@ public sealed class RoundPredictionView
     public int StartedWithoutPredictionCount { get; init; }
     public int OpenWithoutPredictionCount { get; init; }
     public string? LockReason { get; init; }
-    public bool CanSendAudit => IsFinalized && !IsLocked;
+    public bool CanSendAudit => IsFinalized;
 }
 
 public sealed class MatchPredictionView

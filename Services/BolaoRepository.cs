@@ -799,7 +799,7 @@ public sealed class BolaoRepository
     public bool CanSendPredictionAudit(int participantId, int roundId)
     {
         AutoFinalizeStartedPredictionsAndRounds();
-        return GetRoundPrediction(participantId, roundId).CanSendAudit;
+        return IsRoundFinalized(participantId, roundId);
     }
 
     public void MarkSpecialAuditDownloaded(int participantId, DateTimeOffset generatedAt, string proofHash)
@@ -817,9 +817,7 @@ public sealed class BolaoRepository
 
     public bool SaveParticipantAvatar(int participantId, string? avatarKey, out string message)
     {
-        var participant = _db.Participants
-            .AsNoTracking()
-            .SingleOrDefault(item => item.Id == participantId);
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
         if (participant is null)
         {
             message = "Participante nao encontrado.";
@@ -834,9 +832,7 @@ public sealed class BolaoRepository
 
     public bool SaveParticipantAvatarImage(int participantId, string? avatarImagePath, out string message)
     {
-        var participant = _db.Participants
-            .AsNoTracking()
-            .SingleOrDefault(item => item.Id == participantId);
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
         if (participant is null)
         {
             message = "Participante nao encontrado.";
@@ -847,6 +843,68 @@ public sealed class BolaoRepository
         _db.SaveChanges();
         message = "Foto do perfil atualizada.";
         return true;
+    }
+
+    public bool DeleteParticipant(int participantId, string confirmName, out string message)
+    {
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            message = "Participante nao encontrado.";
+            return false;
+        }
+
+        confirmName = confirmName.Trim();
+        if (!string.Equals(participant.Name, confirmName, StringComparison.Ordinal))
+        {
+            message = "Confirmacao invalida. Digite exatamente o nome do participante para excluir.";
+            return false;
+        }
+
+        var executionStrategy = _db.Database.CreateExecutionStrategy();
+        try
+        {
+            executionStrategy.Execute(() =>
+            {
+                using var transaction = _db.Database.BeginTransaction();
+
+                var messages = _db.CopaMessages.Where(item => item.ParticipantId == participantId).ToList();
+                var roundSubmissions = _db.RoundSubmissions.Where(item => item.ParticipantId == participantId).ToList();
+                var predictions = _db.Predictions.Where(item => item.ParticipantId == participantId).ToList();
+                var specialPrediction = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+
+                if (messages.Count > 0)
+                {
+                    _db.CopaMessages.RemoveRange(messages);
+                }
+
+                if (roundSubmissions.Count > 0)
+                {
+                    _db.RoundSubmissions.RemoveRange(roundSubmissions);
+                }
+
+                if (predictions.Count > 0)
+                {
+                    _db.Predictions.RemoveRange(predictions);
+                }
+
+                if (specialPrediction is not null)
+                {
+                    _db.SpecialPredictions.Remove(specialPrediction);
+                }
+
+                _db.Participants.Remove(participant);
+                _db.SaveChanges();
+                transaction.Commit();
+            });
+
+            message = "Participante e todos os dados vinculados foram excluidos.";
+            return true;
+        }
+        catch
+        {
+            throw;
+        }
     }
 
     public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
@@ -1243,7 +1301,7 @@ public sealed class BolaoRepository
     private DateTimeOffset? GetRoundDraftLockTime(int roundId)
     {
         var firstKickoff = _db.Matches
-            .Where(match => match.RoundId == roundId)
+            .AsNoTracking()
             .OrderBy(match => match.Kickoff)
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
             .FirstOrDefault();
@@ -1262,7 +1320,7 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites desta rodada travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites da competicao travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 
