@@ -15,11 +15,13 @@ namespace BolaoCopa2026.Pages.Conta;
 public class PerfilModel : PageModel
 {
     private readonly BolaoRepository _repository;
+    private readonly AuditImageService _auditImageService;
     private readonly IWebHostEnvironment _environment;
 
-    public PerfilModel(BolaoRepository repository, IWebHostEnvironment environment)
+    public PerfilModel(BolaoRepository repository, AuditImageService auditImageService, IWebHostEnvironment environment)
     {
         _repository = repository;
+        _auditImageService = auditImageService;
         _environment = environment;
     }
 
@@ -105,6 +107,30 @@ public class PerfilModel : PageModel
 
         TempData["Status"] = "Foto removida do perfil.";
         return RedirectToPage();
+    }
+
+    public IActionResult OnGetDownloadFullAudit()
+    {
+        var package = _auditImageService.BuildFullAuditPackage(_repository.CurrentParticipantId);
+        if (package is null)
+        {
+            TempData["Status"] = "Comprovante bloqueado: finalize ao menos uma rodada ou seus palpites especiais antes de baixar a auditoria completa.";
+            return RedirectToPage();
+        }
+
+        var pdf = _auditImageService.RenderFullAuditPdf(package);
+        foreach (var snapshot in package.RoundSnapshots)
+        {
+            _auditImageService.MarkDownloaded(snapshot);
+        }
+
+        if (package.SpecialSnapshot is not null)
+        {
+            _repository.MarkSpecialAuditDownloaded(package.Participant.Id, package.SpecialSnapshot.GeneratedAt, package.SpecialSnapshot.ProofHash);
+        }
+
+        var fileName = $"auditoria-completa-{package.Participant.Id}.pdf";
+        return File(pdf, "application/pdf", fileName);
     }
 
     private void LoadData()
