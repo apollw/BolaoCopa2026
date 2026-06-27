@@ -13,7 +13,7 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<BolaoDbContext>(options =>
 {
-    options.UseNpgsql(GetPostgresConnectionString(builder.Configuration), postgres =>
+    options.UseNpgsql(GetPostgresConnectionString(builder.Configuration, builder.Environment.EnvironmentName), postgres =>
     {
         postgres.CommandTimeout(120);
         postgres.EnableRetryOnFailure();
@@ -91,11 +91,21 @@ app.MapRazorPages()
 
 app.Run();
 
-static string GetPostgresConnectionString(IConfiguration configuration)
+static string GetPostgresConnectionString(IConfiguration configuration, string environmentName)
 {
     var configured = configuration.GetConnectionString("BolaoDb");
     var databaseUrl = Environment.GetEnvironmentVariable("SUPABASE_DATABASE_URL")
         ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+    if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            throw new InvalidOperationException("Configure ConnectionStrings:BolaoDb em appsettings.Local.json para rodar localmente.");
+        }
+
+        return configured;
+    }
 
     if (!string.IsNullOrWhiteSpace(databaseUrl))
     {
@@ -106,7 +116,6 @@ static string GetPostgresConnectionString(IConfiguration configuration)
     {
         throw new InvalidOperationException("Configure SUPABASE_DATABASE_URL, DATABASE_URL ou ConnectionStrings:BolaoDb para conectar ao PostgreSQL/Supabase.");
     }
-
     return configured.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
         || configured.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
         ? ConvertDatabaseUrl(configured)

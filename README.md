@@ -27,8 +27,10 @@ O projeto centraliza palpites por rodada, ranking, regras de pontuacao, estatist
 Local com Supabase/PostgreSQL:
 
 ```bash
-DOTNET_CLI_HOME=.dotnet SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres" dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
+dotnet run --project BolaoCopa2026.csproj --urls http://localhost:5086
 ```
+
+O arquivo `appsettings.Local.json` na raiz do projeto e carregado automaticamente quando existe. Em desenvolvimento ele e a fonte local de banco, e deve conter a connection string do PostgreSQL/Supabase no formato Npgsql e a senha do admin para teste local.
 
 Acesse:
 
