@@ -84,7 +84,7 @@ A senha administrativa deve ser configurada por `Admin__Password` no ambiente an
 
 O projeto usa exclusivamente PostgreSQL/Supabase em desenvolvimento e producao.
 
-Para Supabase, configure variaveis de ambiente no servidor:
+Para Supabase em producao, configure variaveis de ambiente no servidor:
 
 ```bash
 SUPABASE_DATABASE_URL="postgresql://postgres.PROJECT_REF:SENHA@HOST:5432/postgres"
