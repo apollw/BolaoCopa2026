@@ -1,4 +1,4 @@
-namespace BolaoCopa2026.Catalogs;
+namespace BolaoCopa2026;
 
 public sealed record MessageMoodOption(string Key, string Label, string Emoji);
 

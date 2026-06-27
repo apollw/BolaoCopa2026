@@ -1,5 +1,4 @@
 using BolaoCopa2026;
-using BolaoCopa2026.Catalogs;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
 using Microsoft.EntityFrameworkCore;
