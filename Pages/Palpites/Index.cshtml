@@ -47,7 +47,7 @@
 
     @if (!Model.RoundView.IsFinalized && Model.RoundView.DraftLockUtc is not null)
     {
-        <div class="notice">Os rascunhos desta rodada travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), 1h antes da primeira partida oficial. Depois disso, nao sera mais possivel editar esta rodada.</div>
+        <div class="notice">Os rascunhos travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), 4h antes da primeira partida oficial da competicao. Depois disso, nao sera mais possivel editar esta rodada.</div>
     }
 
     @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
@@ -132,9 +132,9 @@
 <section class="panel action-panel">
     <div>
         <h2>Fechamento da rodada</h2>
-        <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil e o comprovante de auditoria permanece bloqueado.</p>
+        <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil. O comprovante de auditoria so libera depois da finalizacao.</p>
         <p>Os rascunhos sao salvos automaticamente alguns segundos apos cada alteracao. Se preferir, voce tambem pode salvar tudo manualmente.</p>
-        <p>A rodada trava 1h antes da primeira partida oficial. Depois desse prazo, nao sera mais possivel adicionar nem editar palpites. O que estiver salvo permanece como rascunho ate a finalizacao da rodada.</p>
+        <p>Os rascunhos travam 4h antes da primeira partida oficial da competicao. Depois desse prazo, nao sera mais possivel adicionar nem editar palpites. O que estiver salvo permanece como rascunho ate a finalizacao da rodada.</p>
         @if (!Model.RoundView.IsFinalized && !Model.RoundView.IsLocked)
         {
             <small id="draft-save-status" class="save-state">Autosave ativo. As alteracoes desta rodada serao salvas automaticamente.</small>

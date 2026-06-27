@@ -7,21 +7,13 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Load configuration from Config folder
-var configPath = Path.Combine(builder.Environment.ContentRootPath, "Config");
-builder.Configuration
-    .SetBasePath(configPath)
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
-    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables();
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<BolaoDbContext>(options =>
 {
-    options.UseNpgsql(GetPostgresConnectionString(builder.Configuration), postgres =>
+    options.UseNpgsql(GetPostgresConnectionString(builder.Configuration, builder.Environment.EnvironmentName), postgres =>
     {
         postgres.CommandTimeout(120);
         postgres.EnableRetryOnFailure();
@@ -99,11 +91,21 @@ app.MapRazorPages()
 
 app.Run();
 
-static string GetPostgresConnectionString(IConfiguration configuration)
+static string GetPostgresConnectionString(IConfiguration configuration, string environmentName)
 {
     var configured = configuration.GetConnectionString("BolaoDb");
     var databaseUrl = Environment.GetEnvironmentVariable("SUPABASE_DATABASE_URL")
         ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+    if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            throw new InvalidOperationException("Configure ConnectionStrings:BolaoDb em appsettings.Local.json para rodar localmente.");
+        }
+
+        return configured;
+    }
 
     if (!string.IsNullOrWhiteSpace(databaseUrl))
     {
@@ -114,7 +116,6 @@ static string GetPostgresConnectionString(IConfiguration configuration)
     {
         throw new InvalidOperationException("Configure SUPABASE_DATABASE_URL, DATABASE_URL ou ConnectionStrings:BolaoDb para conectar ao PostgreSQL/Supabase.");
     }
-
     return configured.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
         || configured.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
         ? ConvertDatabaseUrl(configured)
@@ -123,19 +124,47 @@ static string GetPostgresConnectionString(IConfiguration configuration)
 
 static string ConvertDatabaseUrl(string databaseUrl)
 {
-    var uri = new Uri(databaseUrl);
-    var userInfo = uri.UserInfo.Split(':', 2);
-    var username = Uri.UnescapeDataString(userInfo[0]);
-    var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
-    var database = uri.AbsolutePath.TrimStart('/');
+    var trimmed = databaseUrl.Trim().Trim('"');
+
+    if (trimmed.Contains("Host=", StringComparison.OrdinalIgnoreCase) || trimmed.Contains("Server=", StringComparison.OrdinalIgnoreCase))
+    {
+        return trimmed;
+    }
+
+    if (!trimmed.Contains("://", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("A connection string precisa estar em formato URL postgresql://... ou no formato Npgsql Host=...;Port=...;");
+    }
+
+    var schemeEnd = trimmed.IndexOf("://", StringComparison.Ordinal);
+    var remainder = trimmed[(schemeEnd + 3)..];
+    var atIndex = remainder.LastIndexOf('@');
+    if (atIndex <= 0 || atIndex >= remainder.Length - 1)
+    {
+        throw new InvalidOperationException("Nao foi possivel ler usuario e host da URL do banco.");
+    }
+
+    var userInfo = remainder[..atIndex];
+    var hostAndDb = remainder[(atIndex + 1)..];
+    var userParts = userInfo.Split(':', 2);
+    var hostParts = hostAndDb.Split('/', 2);
+    if (hostParts.Length < 2)
+    {
+        throw new InvalidOperationException("Nao foi possivel ler o nome do banco na URL do banco.");
+    }
+
+    var hostPort = hostParts[0];
+    var databasePart = hostParts[1];
+    var dbName = databasePart.Split('?', 2)[0];
+    var hostSplit = hostPort.Split(':', 2);
 
     var builder = new NpgsqlConnectionStringBuilder
     {
-        Host = uri.Host,
-        Port = uri.Port > 0 ? uri.Port : 5432,
-        Database = database,
-        Username = username,
-        Password = password,
+        Host = hostSplit[0],
+        Port = hostSplit.Length > 1 && int.TryParse(hostSplit[1], out var port) ? port : 5432,
+        Database = Uri.UnescapeDataString(dbName),
+        Username = Uri.UnescapeDataString(userParts[0]),
+        Password = userParts.Length > 1 ? Uri.UnescapeDataString(userParts[1]) : string.Empty,
         SslMode = SslMode.Require
     };
 

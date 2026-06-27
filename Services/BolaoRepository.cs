@@ -1,5 +1,4 @@
 using BolaoCopa2026;
-using BolaoCopa2026.Catalogs;
 using BolaoCopa2026.Data;
 using BolaoCopa2026.Models;
 using Microsoft.EntityFrameworkCore;
@@ -36,16 +35,24 @@ public sealed class BolaoRepository
         }
     }
 
-    public Participant? CurrentParticipant => _db.Participants.SingleOrDefault(participant => participant.Id == CurrentParticipantId);
-    public IReadOnlyList<PredictionRound> Rounds => _db.Rounds.OrderBy(round => round.Id).ToList();
+    public Participant? CurrentParticipant => _db.Participants
+        .AsNoTracking()
+        .SingleOrDefault(participant => participant.Id == CurrentParticipantId);
+    public IReadOnlyList<PredictionRound> Rounds => _db.Rounds
+        .AsNoTracking()
+        .OrderBy(round => round.Id)
+        .ToList();
     public IReadOnlyList<Match> Matches => _db.Matches
-        .ToList()
+        .AsNoTracking()
         .OrderBy(match => match.Kickoff)
         .ThenBy(match => match.OfficialNumber)
         .ToList();
-    public IReadOnlyList<Participant> Participants => _db.Participants.OrderBy(participant => participant.Name).ToList();
+    public IReadOnlyList<Participant> Participants => _db.Participants
+        .AsNoTracking()
+        .OrderBy(participant => participant.Name)
+        .ToList();
     public IReadOnlyList<ResultAudit> Audits => _db.ResultAudits
-        .ToList()
+        .AsNoTracking()
         .OrderByDescending(audit => audit.RegisteredAt)
         .ToList();
 
@@ -53,15 +60,26 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        var ranking = GetRanking();
+        var rounds = _db.Rounds
+            .AsNoTracking()
+            .OrderBy(round => round.Id)
+            .ToList();
+        var participants = _db.Participants
+            .AsNoTracking()
+            .OrderBy(participant => participant.Name)
+            .ToList();
         var matches = _db.Matches
-            .ToList()
+            .AsNoTracking()
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
+        var predictions = _db.Predictions
+            .AsNoTracking()
+            .ToList();
         var matchesById = matches.ToDictionary(match => match.Id);
+        var ranking = BuildRanking(participants, matchesById, predictions);
+        var groupStandings = BuildGroupStandings(matches);
         var completed = matches.Where(match => match.Result is not null).ToList();
-        var predictions = _db.Predictions.ToList();
         var finalizedPredictions = predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
         var scoredPredictions = finalizedPredictions
             .Where(prediction => matchesById[prediction.MatchId].Result is not null)
@@ -82,8 +100,8 @@ public sealed class BolaoRepository
         return new DashboardStats
         {
             Ranking = ranking,
-            Rounds = Rounds,
-            GroupStandings = GetGroupStandings(),
+            Rounds = rounds,
+            GroupStandings = groupStandings,
             UpcomingMatches = matches.Where(match => match.Result is null).Take(8).ToList(),
             CompletedMatches = completed.OrderByDescending(match => match.Kickoff).ToList(),
             PredictionOutcomeSlices = BuildOutcomeSlices(exactScores, resultHits, scoredPredictions.Count - exactScores - resultHits),
@@ -109,13 +127,13 @@ public sealed class BolaoRepository
         pageSize = Math.Clamp(pageSize, 1, 50);
         page = Math.Max(page, 1);
 
-        var totalMessages = _db.CopaMessages.Count();
+        var totalMessages = _db.CopaMessages.AsNoTracking().Count();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalMessages / (double)pageSize));
         page = Math.Min(page, totalPages);
 
         var rows = (
-            from message in _db.CopaMessages
-            join participant in _db.Participants on message.ParticipantId equals participant.Id
+            from message in _db.CopaMessages.AsNoTracking()
+            join participant in _db.Participants.AsNoTracking() on message.ParticipantId equals participant.Id
             orderby message.CreatedAt descending, message.Id descending
             select new
             {
@@ -166,7 +184,9 @@ public sealed class BolaoRepository
     public bool AddMessage(int participantId, string body, string? moodKey, out string message, out MessageBoardEntry? createdEntry)
     {
         createdEntry = null;
-        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        var participant = _db.Participants
+            .AsNoTracking()
+            .SingleOrDefault(item => item.Id == participantId);
         if (participant is null)
         {
             message = "Participante nao encontrado.";
@@ -258,8 +278,13 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
-        var matches = _db.Matches.ToList();
+        var participants = _db.Participants
+            .AsNoTracking()
+            .OrderBy(participant => participant.Name)
+            .ToList();
+        var matches = _db.Matches
+            .AsNoTracking()
+            .ToList();
         var matchesByRound = matches
             .GroupBy(match => match.RoundId)
             .ToDictionary(group => group.Key, group => group.ToList());
@@ -268,6 +293,7 @@ public sealed class BolaoRepository
             .Select(kvp => kvp.Key)
             .ToHashSet();
         var definitiveCounts = _db.Predictions
+            .AsNoTracking()
             .Where(prediction => prediction.SubmittedAt != null)
             .AsEnumerable()
             .Where(prediction => 
@@ -280,11 +306,13 @@ public sealed class BolaoRepository
                 group => group.Key,
                 group => group.Count());
         var finalizedRoundCounts = _db.RoundSubmissions
+            .AsNoTracking()
             .GroupBy(submission => submission.ParticipantId)
             .ToDictionary(
                 group => group.Key,
                 group => group.Count());
         var specialPredictionParticipantIds = _db.SpecialPredictions
+            .AsNoTracking()
             .Where(prediction => prediction.SubmittedAt != null)
             .Select(prediction => prediction.ParticipantId)
             .ToHashSet();
@@ -314,7 +342,9 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        var participant = _db.Participants
+            .AsNoTracking()
+            .SingleOrDefault(item => item.Id == participantId);
         if (participant is null)
         {
             return null;
@@ -322,7 +352,7 @@ public sealed class BolaoRepository
 
         var rounds = Rounds;
         var matches = _db.Matches
-            .ToList()
+            .AsNoTracking()
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
@@ -330,12 +360,15 @@ public sealed class BolaoRepository
             .GroupBy(match => match.RoundId)
             .ToDictionary(group => group.Key, group => (IReadOnlyList<Match>)group.ToList());
         var participantPredictions = _db.Predictions
+            .AsNoTracking()
             .Where(prediction => prediction.ParticipantId == participantId)
             .ToDictionary(prediction => prediction.MatchId);
         var participantSubmissions = _db.RoundSubmissions
+            .AsNoTracking()
             .Where(submission => submission.ParticipantId == participantId)
             .ToDictionary(submission => submission.RoundId);
         var specialPrediction = _db.SpecialPredictions
+            .AsNoTracking()
             .SingleOrDefault(prediction => prediction.ParticipantId == participantId && prediction.SubmittedAt != null);
 
         var roundViews = rounds
@@ -419,13 +452,14 @@ public sealed class BolaoRepository
         var draftLockUtc = GetRoundDraftLockTime(selectedRound.Id);
         var now = DateTimeOffset.UtcNow;
         var roundMatches = _db.Matches
+            .AsNoTracking()
             .Where(match => match.RoundId == selectedRound.Id)
-            .ToList()
             .OrderBy(match => match.Kickoff)
             .ThenBy(match => match.OfficialNumber)
             .ToList();
 
         var participantPredictions = _db.Predictions
+            .AsNoTracking()
             .Where(prediction => prediction.ParticipantId == participantId)
             .ToDictionary(prediction => prediction.MatchId);
 
@@ -765,7 +799,7 @@ public sealed class BolaoRepository
     public bool CanSendPredictionAudit(int participantId, int roundId)
     {
         AutoFinalizeStartedPredictionsAndRounds();
-        return GetRoundPrediction(participantId, roundId).CanSendAudit;
+        return IsRoundFinalized(participantId, roundId);
     }
 
     public void MarkSpecialAuditDownloaded(int participantId, DateTimeOffset generatedAt, string proofHash)
@@ -809,6 +843,68 @@ public sealed class BolaoRepository
         _db.SaveChanges();
         message = "Foto do perfil atualizada.";
         return true;
+    }
+
+    public bool DeleteParticipant(int participantId, string confirmName, out string message)
+    {
+        var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            message = "Participante nao encontrado.";
+            return false;
+        }
+
+        confirmName = confirmName.Trim();
+        if (!string.Equals(participant.Name, confirmName, StringComparison.Ordinal))
+        {
+            message = "Confirmacao invalida. Digite exatamente o nome do participante para excluir.";
+            return false;
+        }
+
+        var executionStrategy = _db.Database.CreateExecutionStrategy();
+        try
+        {
+            executionStrategy.Execute(() =>
+            {
+                using var transaction = _db.Database.BeginTransaction();
+
+                var messages = _db.CopaMessages.Where(item => item.ParticipantId == participantId).ToList();
+                var roundSubmissions = _db.RoundSubmissions.Where(item => item.ParticipantId == participantId).ToList();
+                var predictions = _db.Predictions.Where(item => item.ParticipantId == participantId).ToList();
+                var specialPrediction = _db.SpecialPredictions.SingleOrDefault(item => item.ParticipantId == participantId);
+
+                if (messages.Count > 0)
+                {
+                    _db.CopaMessages.RemoveRange(messages);
+                }
+
+                if (roundSubmissions.Count > 0)
+                {
+                    _db.RoundSubmissions.RemoveRange(roundSubmissions);
+                }
+
+                if (predictions.Count > 0)
+                {
+                    _db.Predictions.RemoveRange(predictions);
+                }
+
+                if (specialPrediction is not null)
+                {
+                    _db.SpecialPredictions.Remove(specialPrediction);
+                }
+
+                _db.Participants.Remove(participant);
+                _db.SaveChanges();
+                transaction.Commit();
+            });
+
+            message = "Participante e todos os dados vinculados foram excluidos.";
+            return true;
+        }
+        catch
+        {
+            throw;
+        }
     }
 
     public bool IsRoundAvailable(int participantId, int roundId, out string? reason)
@@ -864,35 +960,19 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        var participants = _db.Participants.OrderBy(participant => participant.Name).ToList();
-        var matches = _db.Matches.ToDictionary(match => match.Id);
-        var predictions = _db.Predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
-
-        return participants
-            .Select(participant =>
-            {
-                var scored = predictions
-                    .Where(prediction => prediction.ParticipantId == participant.Id)
-                    .Select(prediction => _scoringService.Score(matches[prediction.MatchId], prediction))
-                    .ToList();
-
-                return new RankingEntry
-                {
-                    Participant = participant,
-                    Points = scored.Sum(score => score.Points),
-                    ExactScores = scored.Count(score => score.ExactScore),
-                    KnockoutQualifiedHits = scored.Count(score => score.QualifiedHit),
-                    BrazilHits = scored.Count(score => score.BrazilHit),
-                    ResultHits = scored.Count(score => score.ResultHit)
-                };
-            })
-            .OrderByDescending(entry => entry.Points)
-            .ThenByDescending(entry => entry.ExactScores)
-            .ThenByDescending(entry => entry.KnockoutQualifiedHits)
-            .ThenByDescending(entry => entry.BrazilHits)
-            .ThenByDescending(entry => entry.ResultHits)
-            .ThenBy(entry => entry.Participant.Name)
+        var participants = _db.Participants
+            .AsNoTracking()
+            .OrderBy(participant => participant.Name)
             .ToList();
+        var matches = _db.Matches
+            .AsNoTracking()
+            .ToDictionary(match => match.Id);
+        var predictions = _db.Predictions
+            .AsNoTracking()
+            .Where(prediction => prediction.SubmittedAt != null)
+            .ToList();
+
+        return BuildRanking(participants, matches, predictions);
     }
 
     public bool IsRoundFinalized(int participantId, int roundId)
@@ -947,8 +1027,48 @@ public sealed class BolaoRepository
 
     public IReadOnlyList<GroupStanding> GetGroupStandings()
     {
-        return _db.Matches
-            .ToList()
+        var matches = _db.Matches
+            .AsNoTracking()
+            .ToList();
+
+        return BuildGroupStandings(matches);
+    }
+
+    private IReadOnlyList<RankingEntry> BuildRanking(
+        IReadOnlyList<Participant> participants,
+        IReadOnlyDictionary<int, Match> matchesById,
+        IReadOnlyList<Prediction> predictions)
+    {
+        return participants
+            .Select(participant =>
+            {
+                var scored = predictions
+                    .Where(prediction => prediction.ParticipantId == participant.Id)
+                    .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
+                    .ToList();
+
+                return new RankingEntry
+                {
+                    Participant = participant,
+                    Points = scored.Sum(score => score.Points),
+                    ExactScores = scored.Count(score => score.ExactScore),
+                    KnockoutQualifiedHits = scored.Count(score => score.QualifiedHit),
+                    BrazilHits = scored.Count(score => score.BrazilHit),
+                    ResultHits = scored.Count(score => score.ResultHit)
+                };
+            })
+            .OrderByDescending(entry => entry.Points)
+            .ThenByDescending(entry => entry.ExactScores)
+            .ThenByDescending(entry => entry.KnockoutQualifiedHits)
+            .ThenByDescending(entry => entry.BrazilHits)
+            .ThenByDescending(entry => entry.ResultHits)
+            .ThenBy(entry => entry.Participant.Name)
+            .ToList();
+    }
+
+    private IReadOnlyList<GroupStanding> BuildGroupStandings(IReadOnlyList<Match> matches)
+    {
+        return matches
             .Where(match => match.Phase == CompetitionPhase.GroupStage && !string.IsNullOrWhiteSpace(match.GroupName))
             .GroupBy(match => match.GroupName!)
             .OrderBy(group => group.Key)
@@ -1181,7 +1301,7 @@ public sealed class BolaoRepository
     private DateTimeOffset? GetRoundDraftLockTime(int roundId)
     {
         var firstKickoff = _db.Matches
-            .Where(match => match.RoundId == roundId)
+            .AsNoTracking()
             .OrderBy(match => match.Kickoff)
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
             .FirstOrDefault();
@@ -1200,7 +1320,7 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites desta rodada travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites da competicao travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 

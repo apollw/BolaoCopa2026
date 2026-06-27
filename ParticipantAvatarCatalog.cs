@@ -1,6 +1,6 @@
 using BolaoCopa2026.Models;
 
-namespace BolaoCopa2026.Catalogs;
+namespace BolaoCopa2026;
 
 public sealed record ParticipantAvatarVisual(string Key, string Label, string Kind, string? ImageUrl = null, string? Symbol = null);
 

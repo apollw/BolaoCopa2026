@@ -1,0 +1,52 @@
+@page
+@model BolaoCopa2026.Pages.Admin.UsuariosModel
+@{
+    ViewData["Title"] = "Usuarios";
+}
+
+<section class="page-title">
+    <p class="eyebrow">Administracao</p>
+    <h1>Gerenciar usuarios</h1>
+</section>
+
+@if (TempData["Status"] is string status)
+{
+    <div class="notice">@status</div>
+}
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Exclusao completa</h2>
+        <span>remove usuario, palpites, rascunhos, mensagens e especiais</span>
+    </div>
+
+    <div class="stacked-list">
+        @foreach (var item in Model.Participants)
+        {
+            var participant = item.Participant;
+            <article class="prediction-row">
+                <div>
+                    <strong>@participant.Name</strong>
+                    <span>@participant.Login - @participant.Email</span>
+                    <span>@(participant.IsAdmin ? "Administrador" : "Participante")</span>
+                    <span>@item.PredictionCount palpites, @item.RoundSubmissionCount rodadas finalizadas, @item.MessageCount mensagens</span>
+                    @if (item.HasSpecialPrediction)
+                    {
+                        <small class="save-state">Possui palpite especial finalizado.</small>
+                    }
+                </div>
+                <form method="post"
+                      asp-page-handler="DeleteParticipant"
+                      class="stacked-form"
+                      onsubmit="return confirm('Exclusao definitiva. Digite o nome exato do usuario no campo de confirmacao.');">
+                    <input type="hidden" name="participantId" value="@participant.Id" />
+                    <label>
+                        <span>Digite o nome exato para confirmar</span>
+                        <input type="text" name="confirmName" autocomplete="off" required placeholder="@participant.Name" />
+                    </label>
+                    <button type="submit" class="btn-app danger">Excluir usuario e todos os dados</button>
+                </form>
+            </article>
+        }
+    </div>
+</section>
