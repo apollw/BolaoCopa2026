@@ -239,6 +239,7 @@ public sealed class MatchPredictionView
     public Prediction? Prediction { get; init; }
     public bool HasStarted { get; init; }
     public bool CanEdit { get; init; }
+    public required string DisplayLabel { get; init; }
 }
 
 public sealed class RoundDraftUpdate

@@ -59,6 +59,7 @@ public sealed class BolaoRepository
     public DashboardStats GetDashboard()
     {
         AutoFinalizeStartedPredictionsAndRounds();
+        TryApplyKnockoutPairings();
 
         var rounds = _db.Rounds
             .AsNoTracking()
@@ -444,6 +445,7 @@ public sealed class BolaoRepository
     public RoundPredictionView GetRoundPrediction(int participantId, int? roundId)
     {
         AutoFinalizeStartedPredictionsAndRounds();
+        TryApplyKnockoutPairings();
 
         var rounds = Rounds;
         var selectedRound = rounds.SingleOrDefault(round => round.Id == roundId) ?? rounds.First();
@@ -472,7 +474,8 @@ public sealed class BolaoRepository
                     Match = match,
                     Prediction = participantPredictions.GetValueOrDefault(match.Id),
                     HasStarted = hasStarted,
-                    CanEdit = !isLocked && !isFinalized
+                    CanEdit = !isLocked && !isFinalized,
+                    DisplayLabel = GetMatchDisplayLabel(match)
                 };
             })
             .ToList();
@@ -1299,6 +1302,7 @@ public sealed class BolaoRepository
     private DateTimeOffset? GetRoundDraftLockTime(int roundId)
     {
         var firstKickoff = _db.Matches
+            .Where(match => match.RoundId == roundId)
             .AsNoTracking()
             .OrderBy(match => match.Kickoff)
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
@@ -1318,7 +1322,7 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites da competicao travaram 4h antes da primeira partida oficial ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites desta rodada travaram 4h antes da primeira partida ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 
@@ -1346,6 +1350,67 @@ public sealed class BolaoRepository
             _ when qualifiedTeamCode == match.HomeTeam.Code => match.HomeTeam.Name,
             _ when qualifiedTeamCode == match.AwayTeam.Code => match.AwayTeam.Name,
             _ => qualifiedTeamCode
+        };
+    }
+
+    private static string GetMatchDisplayLabel(Match match)
+    {
+        if (match.Phase == CompetitionPhase.GroupStage)
+        {
+            return match.GroupName ?? "Fase de grupos";
+        }
+
+        return match.Phase switch
+        {
+            CompetitionPhase.RoundOf32 => match.OfficialNumber switch
+            {
+                73 => "Segunda fase 1",
+                74 => "Segunda fase 2",
+                75 => "Segunda fase 3",
+                76 => "Segunda fase 4",
+                77 => "Segunda fase 5",
+                78 => "Segunda fase 6",
+                79 => "Segunda fase 7",
+                80 => "Segunda fase 8",
+                81 => "Segunda fase 9",
+                82 => "Segunda fase 10",
+                83 => "Segunda fase 11",
+                84 => "Segunda fase 12",
+                85 => "Segunda fase 13",
+                86 => "Segunda fase 14",
+                87 => "Segunda fase 15",
+                88 => "Segunda fase 16",
+                _ => match.OfficialNumber.ToString()
+            },
+            CompetitionPhase.RoundOf16 => match.OfficialNumber switch
+            {
+                89 => "W73 x W75",
+                90 => "W74 x W77",
+                91 => "W76 x W78",
+                92 => "W79 x W80",
+                93 => "W83 x W84",
+                94 => "W81 x W82",
+                95 => "W86 x W88",
+                96 => "W85 x W87",
+                _ => match.OfficialNumber.ToString()
+            },
+            CompetitionPhase.QuarterFinal => match.OfficialNumber switch
+            {
+                97 => "W89 x W90",
+                98 => "W93 x W94",
+                99 => "W91 x W92",
+                100 => "W95 x W96",
+                _ => match.OfficialNumber.ToString()
+            },
+            CompetitionPhase.SemiFinal => match.OfficialNumber switch
+            {
+                101 => "W97 x W98",
+                102 => "W99 x W100",
+                _ => match.OfficialNumber.ToString()
+            },
+            CompetitionPhase.ThirdPlace => "L101 x L102",
+            CompetitionPhase.Final => "W101 x W102",
+            _ => match.Phase.ToString()
         };
     }
 
@@ -1485,61 +1550,25 @@ public sealed class BolaoRepository
 
     private void TryApplyKnockoutPairings()
     {
-        if (!AreAllGroupStageResultsRegistered())
+        var changed = false;
+        var pairings = new Dictionary<int, (Team Home, Team Away)>
         {
-            return;
-        }
-
-        var standings = GetGroupStandings()
-            .ToDictionary(standing => standing.GroupName.Replace("Grupo ", string.Empty), standing => standing.Entries);
-        var thirdPlaces = standings
-            .Select(item => new { Group = item.Key, Entry = item.Value.ElementAt(2) })
-            .OrderByDescending(item => item.Entry.Points)
-            .ThenByDescending(item => item.Entry.GoalDifference)
-            .ThenByDescending(item => item.Entry.GoalsFor)
-            .ThenBy(item => item.Entry.FairPlayPenalty)
-            .ThenBy(item => item.Entry.FifaRanking)
-            .ThenBy(item => item.Entry.Team.Name)
-            .Take(8)
-            .ToList();
-        var usedThirdGroups = new HashSet<string>();
-
-        Team Resolve(string token)
-        {
-            if (token.StartsWith('1') || token.StartsWith('2'))
-            {
-                var index = token[0] == '1' ? 0 : 1;
-                return standings[token[1].ToString()][index].Team;
-            }
-
-            if (token.StartsWith('3'))
-            {
-                var allowedGroups = token[1..].Split('/', StringSplitOptions.RemoveEmptyEntries);
-                var third = thirdPlaces.FirstOrDefault(item => allowedGroups.Contains(item.Group) && usedThirdGroups.Add(item.Group));
-                return third?.Entry.Team ?? new Team(token, token);
-            }
-
-            return new Team(token, token);
-        }
-
-        var pairings = new Dictionary<int, (string Home, string Away)>
-        {
-            [73] = ("2A", "2B"),
-            [74] = ("1E", "3A/B/C/D/F"),
-            [75] = ("1F", "2C"),
-            [76] = ("1C", "2F"),
-            [77] = ("1I", "3C/D/F/G/H"),
-            [78] = ("2E", "2I"),
-            [79] = ("1A", "3C/E/F/H/I"),
-            [80] = ("1L", "3E/H/I/J/K"),
-            [81] = ("1D", "3B/E/F/I/J"),
-            [82] = ("1G", "3A/E/H/I/J"),
-            [83] = ("2K", "2L"),
-            [84] = ("1H", "2J"),
-            [85] = ("1B", "3E/F/G/I/J"),
-            [86] = ("1J", "2H"),
-            [87] = ("1K", "3D/E/I/J/L"),
-            [88] = ("2D", "2G")
+            [73] = (ResolveCatalogTeam("GER"), ResolveCatalogTeam("PAR")),
+            [74] = (ResolveCatalogTeam("FRA"), ResolveCatalogTeam("SWE")),
+            [75] = (ResolveCatalogTeam("RSA"), ResolveCatalogTeam("CAN")),
+            [76] = (ResolveCatalogTeam("NED"), ResolveCatalogTeam("MAR")),
+            [77] = (ResolveCatalogTeam("POR"), ResolveCatalogTeam("CRO")),
+            [78] = (ResolveCatalogTeam("ESP"), ResolveCatalogTeam("AUT")),
+            [79] = (ResolveCatalogTeam("USA"), ResolveCatalogTeam("BIH")),
+            [80] = (ResolveCatalogTeam("BEL"), ResolveCatalogTeam("SEN")),
+            [81] = (ResolveCatalogTeam("BRA"), ResolveCatalogTeam("JPN")),
+            [82] = (ResolveCatalogTeam("CIV"), ResolveCatalogTeam("NOR")),
+            [83] = (ResolveCatalogTeam("MEX"), ResolveCatalogTeam("ECU")),
+            [84] = (ResolveCatalogTeam("ENG"), ResolveCatalogTeam("COD")),
+            [85] = (ResolveCatalogTeam("ARG"), ResolveCatalogTeam("CPV")),
+            [86] = (ResolveCatalogTeam("AUS"), ResolveCatalogTeam("EGY")),
+            [87] = (ResolveCatalogTeam("SUI"), ResolveCatalogTeam("ALG")),
+            [88] = (ResolveCatalogTeam("COL"), ResolveCatalogTeam("GHA"))
         };
 
         foreach (var (officialNumber, pairing) in pairings)
@@ -1550,11 +1579,28 @@ public sealed class BolaoRepository
                 continue;
             }
 
-            match.HomeTeam = Resolve(pairing.Home);
-            match.AwayTeam = Resolve(pairing.Away);
+            if (match.HomeTeam.Code == pairing.Home.Code && match.AwayTeam.Code == pairing.Away.Code)
+            {
+                continue;
+            }
+
+            match.HomeTeam = pairing.Home;
+            match.AwayTeam = pairing.Away;
+            changed = true;
         }
 
-        _db.SaveChanges();
+        if (changed)
+        {
+            _db.SaveChanges();
+        }
+    }
+
+    private static Team ResolveCatalogTeam(string teamCode)
+    {
+        var catalogEntry = TeamCatalog.Resolve(teamCode);
+        return catalogEntry is null
+            ? new Team(teamCode, teamCode)
+            : new Team(catalogEntry.Code, catalogEntry.Name, catalogEntry.IsBrazil);
     }
 
     private sealed class MutableGroupStanding
