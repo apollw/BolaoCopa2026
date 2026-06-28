@@ -1080,7 +1080,7 @@ public sealed class BolaoRepository
             .ToList();
     }
 
-    private static IReadOnlyList<GroupStandingEntry> BuildGroupEntries(IReadOnlyList<Match> matches)
+    private IReadOnlyList<GroupStandingEntry> BuildGroupEntries(IReadOnlyList<Match> matches)
     {
         var entries = new Dictionary<string, MutableGroupStanding>();
 
@@ -1098,13 +1098,11 @@ public sealed class BolaoRepository
             ApplyResult(entries[match.AwayTeam.Code], match.Result.AwayGoals, match.Result.HomeGoals);
         }
 
-        return entries.Values
+        var ordered = entries.Values
             .Select(entry => entry.ToEntry())
-            .OrderByDescending(entry => entry.Points)
-            .ThenByDescending(entry => entry.GoalDifference)
-            .ThenByDescending(entry => entry.GoalsFor)
-            .ThenBy(entry => entry.Team.Name)
             .ToList();
+
+        return OrderGroupStandings(ordered, matches);
     }
 
     private bool IsSpecialPredictionLocked(SpecialPrediction? prediction, out string? reason)
@@ -1499,6 +1497,9 @@ public sealed class BolaoRepository
             .OrderByDescending(item => item.Entry.Points)
             .ThenByDescending(item => item.Entry.GoalDifference)
             .ThenByDescending(item => item.Entry.GoalsFor)
+            .ThenBy(item => item.Entry.FairPlayPenalty)
+            .ThenBy(item => item.Entry.FifaRanking)
+            .ThenBy(item => item.Entry.Team.Name)
             .Take(8)
             .ToList();
         var usedThirdGroups = new HashSet<string>();
@@ -1561,6 +1562,7 @@ public sealed class BolaoRepository
         public MutableGroupStanding(Team team)
         {
             Team = team;
+            FifaRanking = TeamCatalog.ResolveFifaRanking(team.Code);
         }
 
         public Team Team { get; }
@@ -1571,6 +1573,9 @@ public sealed class BolaoRepository
         public int GoalsFor { get; set; }
         public int GoalsAgainst { get; set; }
         public int Points { get; set; }
+        public int FairPlayPenalty { get; set; }
+        public int FifaRanking { get; }
+        public int GoalDifference => GoalsFor - GoalsAgainst;
 
         public GroupStandingEntry ToEntry()
         {
@@ -1583,8 +1588,112 @@ public sealed class BolaoRepository
                 Losses = Losses,
                 GoalsFor = GoalsFor,
                 GoalsAgainst = GoalsAgainst,
-                Points = Points
+                Points = Points,
+                FairPlayPenalty = FairPlayPenalty,
+                FifaRanking = FifaRanking
             };
         }
+    }
+
+    private static IReadOnlyList<GroupStandingEntry> OrderGroupStandings(
+        IReadOnlyList<GroupStandingEntry> entries,
+        IReadOnlyList<Match> matches)
+    {
+        var ordered = new List<GroupStandingEntry>();
+
+        foreach (var pointGroup in entries
+                     .OrderByDescending(entry => entry.Points)
+                     .GroupBy(entry => entry.Points)
+                     .OrderByDescending(group => group.Key))
+        {
+            var tiedEntries = pointGroup.ToList();
+            if (tiedEntries.Count == 1)
+            {
+                ordered.Add(tiedEntries[0]);
+                continue;
+            }
+
+            ordered.AddRange(OrderTiedGroup(tiedEntries, matches));
+        }
+
+        return ordered;
+    }
+
+    private static IReadOnlyList<GroupStandingEntry> OrderTiedGroup(
+        IReadOnlyList<GroupStandingEntry> tiedEntries,
+        IReadOnlyList<Match> matches)
+    {
+        var headToHeadStats = BuildHeadToHeadStats(tiedEntries, matches);
+        var ordered = tiedEntries
+            .OrderByDescending(entry => headToHeadStats[entry.Team.Code].Points)
+            .ThenByDescending(entry => headToHeadStats[entry.Team.Code].GoalDifference)
+            .ThenByDescending(entry => headToHeadStats[entry.Team.Code].GoalsFor)
+            .ToList();
+
+        var groups = ordered
+            .GroupBy(entry => new
+            {
+                Points = headToHeadStats[entry.Team.Code].Points,
+                GoalDifference = headToHeadStats[entry.Team.Code].GoalDifference,
+                GoalsFor = headToHeadStats[entry.Team.Code].GoalsFor
+            })
+            .Select(group => group.ToList())
+            .ToList();
+
+        if (groups.Count == 1 && groups[0].Count == tiedEntries.Count)
+        {
+            return OrderByOverallCriteria(tiedEntries);
+        }
+
+        var resolved = new List<GroupStandingEntry>();
+
+        foreach (var subgroup in groups)
+        {
+            resolved.AddRange(subgroup.Count == 1
+                ? subgroup
+                : OrderTiedGroup(subgroup, matches));
+        }
+
+        return resolved;
+    }
+
+    private static IReadOnlyDictionary<string, MutableGroupStanding> BuildHeadToHeadStats(
+        IReadOnlyList<GroupStandingEntry> entries,
+        IReadOnlyList<Match> matches)
+    {
+        var teamCodes = entries
+            .Select(entry => entry.Team.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var stats = entries.ToDictionary(entry => entry.Team.Code, entry => new MutableGroupStanding(entry.Team));
+
+        foreach (var match in matches)
+        {
+            if (!teamCodes.Contains(match.HomeTeam.Code) || !teamCodes.Contains(match.AwayTeam.Code))
+            {
+                continue;
+            }
+
+            if (match.Result is null)
+            {
+                continue;
+            }
+
+            ApplyResult(stats[match.HomeTeam.Code], match.Result.HomeGoals, match.Result.AwayGoals);
+            ApplyResult(stats[match.AwayTeam.Code], match.Result.AwayGoals, match.Result.HomeGoals);
+        }
+
+        return stats;
+    }
+
+    private static IReadOnlyList<GroupStandingEntry> OrderByOverallCriteria(IReadOnlyList<GroupStandingEntry> entries)
+    {
+        return entries
+            .OrderByDescending(entry => entry.Points)
+            .ThenByDescending(entry => entry.GoalDifference)
+            .ThenByDescending(entry => entry.GoalsFor)
+            .ThenBy(entry => entry.FairPlayPenalty)
+            .ThenBy(entry => entry.FifaRanking)
+            .ThenBy(entry => entry.Team.Name)
+            .ToList();
     }
 }

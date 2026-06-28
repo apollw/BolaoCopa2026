@@ -284,6 +284,8 @@ public sealed class GroupStandingEntry
     public int GoalsAgainst { get; init; }
     public int GoalDifference => GoalsFor - GoalsAgainst;
     public int Points { get; init; }
+    public int FairPlayPenalty { get; init; }
+    public int FifaRanking { get; init; }
 }
 
 public sealed class AuditSnapshot

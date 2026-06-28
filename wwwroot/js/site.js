@@ -69,7 +69,8 @@
                 }
             });
 
-            if (response.redirected) {
+            const contentType = response.headers.get("content-type") || "";
+            if (response.redirected || !contentType.includes("image/png")) {
                 hide();
                 window.location.assign(response.url);
                 return;
