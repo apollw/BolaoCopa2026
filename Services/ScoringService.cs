@@ -35,7 +35,7 @@ public sealed class ScoringService
 
         if (match.IsKnockout)
         {
-            points = Math.Min(points, 8);
+            points = Math.Min(points, 7);
         }
 
         if (match.IncludesBrazil)

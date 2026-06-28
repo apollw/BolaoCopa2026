@@ -17,6 +17,7 @@ public static class BolaoSeedData
         if (db.Rounds.Any())
         {
             EnsureMissingMatches(db);
+            EnsureOfficialRoundOf32Matches(db);
             return;
         }
 
@@ -63,6 +64,40 @@ public static class BolaoSeedData
 
         db.Matches.AddRange(missing);
         db.SaveChanges();
+    }
+
+    private static void EnsureOfficialRoundOf32Matches(BolaoDbContext db)
+    {
+        var officialMatches = SeedMatches()
+            .Where(match => match.Phase == CompetitionPhase.RoundOf32)
+            .ToDictionary(match => match.OfficialNumber);
+        var existingMatches = db.Matches
+            .Where(match => match.Phase == CompetitionPhase.RoundOf32 || (match.OfficialNumber >= 73 && match.OfficialNumber <= 88))
+            .ToList();
+        var changed = false;
+
+        foreach (var match in existingMatches)
+        {
+            if (match.Result is not null || !officialMatches.TryGetValue(match.OfficialNumber, out var official))
+            {
+                continue;
+            }
+
+            if (match.HomeTeam.Code == official.HomeTeam.Code
+                && match.AwayTeam.Code == official.AwayTeam.Code)
+            {
+                continue;
+            }
+
+            match.HomeTeam = CloneTeam(official.HomeTeam);
+            match.AwayTeam = CloneTeam(official.AwayTeam);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            db.SaveChanges();
+        }
     }
 
     private static List<PredictionRound> SeedRounds()
@@ -251,37 +286,37 @@ public static class BolaoSeedData
 
     private static int AddKnockout(List<Match> matches, int id)
     {
-        void Add(int number, int roundId, CompetitionPhase phase, string date, string home, string away, string venue, int hour = 16)
+        void Add(int number, int roundId, CompetitionPhase phase, string date, string home, string away, string venue, int hour = 16, int minute = 0)
         {
             matches.Add(new Match
             {
                 Id = id++,
                 OfficialNumber = number,
                 RoundId = roundId,
-                HomeTeam = new Team(home, home),
-                AwayTeam = new Team(away, away),
+                HomeTeam = ResolveSeedTeam(home),
+                AwayTeam = ResolveSeedTeam(away),
                 Phase = phase,
                 Venue = venue,
-                Kickoff = Kickoff(date, hour)
+                Kickoff = Kickoff(date, hour, minute)
             });
         }
 
-        Add(73, 4, CompetitionPhase.RoundOf32, "2026-06-28", "2A", "2B", "SoFi Stadium", 12);
-        Add(74, 4, CompetitionPhase.RoundOf32, "2026-06-29", "1E", "3A/B/C/D/F", "Gillette Stadium", 16);
-        Add(75, 4, CompetitionPhase.RoundOf32, "2026-06-29", "1F", "2C", "Estadio Monterrey", 19);
-        Add(76, 4, CompetitionPhase.RoundOf32, "2026-06-29", "1C", "2F", "NRG Stadium", 12);
-        Add(77, 4, CompetitionPhase.RoundOf32, "2026-06-30", "1I", "3C/D/F/G/H", "New York New Jersey Stadium");
-        Add(78, 4, CompetitionPhase.RoundOf32, "2026-06-30", "2E", "2I", "Dallas Stadium", 19);
-        Add(79, 4, CompetitionPhase.RoundOf32, "2026-07-01", "1A", "3C/E/F/H/I", "Mexico City Stadium");
-        Add(80, 4, CompetitionPhase.RoundOf32, "2026-07-01", "1L", "3E/H/I/J/K", "Atlanta Stadium", 19);
-        Add(81, 4, CompetitionPhase.RoundOf32, "2026-07-01", "1D", "3B/E/F/I/J", "San Francisco Bay Area Stadium", 22);
-        Add(82, 4, CompetitionPhase.RoundOf32, "2026-07-02", "1G", "3A/E/H/I/J", "Seattle Stadium");
-        Add(83, 4, CompetitionPhase.RoundOf32, "2026-07-02", "2K", "2L", "Toronto Stadium", 19);
-        Add(84, 4, CompetitionPhase.RoundOf32, "2026-07-02", "1H", "2J", "SoFi Stadium", 22);
-        Add(85, 4, CompetitionPhase.RoundOf32, "2026-07-03", "1B", "3E/F/G/I/J", "BC Place Vancouver");
-        Add(86, 4, CompetitionPhase.RoundOf32, "2026-07-03", "1J", "2H", "Miami Stadium", 19);
-        Add(87, 4, CompetitionPhase.RoundOf32, "2026-07-03", "1K", "3D/E/I/J/L", "Kansas City Stadium", 22);
-        Add(88, 4, CompetitionPhase.RoundOf32, "2026-07-03", "2D", "2G", "Dallas Stadium", 13);
+        Add(73, 4, CompetitionPhase.RoundOf32, "2026-06-29", "GER", "PAR", "Boston", 17, 30);
+        Add(74, 4, CompetitionPhase.RoundOf32, "2026-06-30", "FRA", "SWE", "Nova Jersey", 18);
+        Add(75, 4, CompetitionPhase.RoundOf32, "2026-06-28", "RSA", "CAN", "Los Angeles", 16);
+        Add(76, 4, CompetitionPhase.RoundOf32, "2026-06-29", "NED", "MAR", "El Gigante de Acero", 22);
+        Add(77, 4, CompetitionPhase.RoundOf32, "2026-07-02", "POR", "CRO", "Toronto Field", 20);
+        Add(78, 4, CompetitionPhase.RoundOf32, "2026-07-02", "ESP", "AUT", "Los Angeles", 16);
+        Add(79, 4, CompetitionPhase.RoundOf32, "2026-07-01", "USA", "BIH", "Santa Clara", 21);
+        Add(80, 4, CompetitionPhase.RoundOf32, "2026-07-01", "BEL", "SEN", "Seattle Field", 17);
+        Add(81, 4, CompetitionPhase.RoundOf32, "2026-06-29", "BRA", "JPN", "Houston", 14);
+        Add(82, 4, CompetitionPhase.RoundOf32, "2026-06-30", "CIV", "NOR", "Dallas", 14);
+        Add(83, 4, CompetitionPhase.RoundOf32, "2026-06-30", "MEX", "ECU", "Azteca", 22);
+        Add(84, 4, CompetitionPhase.RoundOf32, "2026-07-01", "ENG", "COD", "Atlanta", 13);
+        Add(85, 4, CompetitionPhase.RoundOf32, "2026-07-03", "ARG", "CPV", "Miami", 19);
+        Add(86, 4, CompetitionPhase.RoundOf32, "2026-07-03", "AUS", "EGY", "Dallas", 15);
+        Add(87, 4, CompetitionPhase.RoundOf32, "2026-07-03", "SUI", "ALG", "Vancouver Place", 0);
+        Add(88, 4, CompetitionPhase.RoundOf32, "2026-07-03", "COL", "GHA", "Kansas City", 22, 30);
 
         Add(89, 5, CompetitionPhase.RoundOf16, "2026-07-04", "W73", "W75", "Philadelphia Stadium");
         Add(90, 5, CompetitionPhase.RoundOf16, "2026-07-04", "W74", "W77", "Houston Stadium", 19);
@@ -303,16 +338,24 @@ public static class BolaoSeedData
         return id;
     }
 
-    private static DateTimeOffset Kickoff(string date, int hour)
+    private static DateTimeOffset Kickoff(string date, int hour, int minute = 0)
     {
         var parsed = DateOnly.Parse(date);
-        return new DateTimeOffset(parsed.Year, parsed.Month, parsed.Day, hour, 0, 0, TimeSpan.FromHours(-3))
+        return new DateTimeOffset(parsed.Year, parsed.Month, parsed.Day, hour, minute, 0, TimeSpan.FromHours(-3))
             .ToUniversalTime();
     }
 
     private static Team CloneTeam(Team team)
     {
         return new Team(team.Code, team.Name, team.IsBrazil);
+    }
+
+    private static Team ResolveSeedTeam(string value)
+    {
+        var team = TeamCatalog.Resolve(value);
+        return team is null
+            ? new Team(value, value)
+            : new Team(team.Code, team.Name, team.IsBrazil);
     }
 
     private sealed record GroupSeed(

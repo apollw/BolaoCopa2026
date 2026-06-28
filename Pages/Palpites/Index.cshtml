@@ -47,7 +47,7 @@
 
     @if (!Model.RoundView.IsFinalized && Model.RoundView.DraftLockUtc is not null)
     {
-        <div class="notice">Os rascunhos travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), 4h antes da primeira partida oficial da competicao. Depois disso, nao sera mais possivel editar esta rodada.</div>
+        <div class="notice">Os rascunhos travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), 4h antes da primeira partida desta rodada. Depois disso, nao sera mais possivel editar esta rodada.</div>
     }
 
     @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
@@ -94,7 +94,7 @@
                                 <span>@TeamDisplay.GetName(match.AwayTeam)</span>
                             </span>
                         </strong>
-                        <span>@(match.GroupName ?? match.Phase.ToString()) - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
+                        <span>@item.DisplayLabel - @match.Kickoff.ToString("dd/MM/yyyy HH:mm") - @match.Venue</span>
                         @if (prediction is not null)
                         {
                             <small class="save-state">Salvo no perfil: @prediction.SavedAt.ToLocalTime().ToString("dd/MM HH:mm")</small>
