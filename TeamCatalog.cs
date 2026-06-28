@@ -58,6 +58,59 @@ public static class TeamCatalog
         new("COL", "Colombia")
     ];
 
+    public static IReadOnlyDictionary<string, int> FifaRanking2025 { get; } =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["USA"] = 14,
+            ["MEX"] = 15,
+            ["CAN"] = 27,
+            ["ESP"] = 1,
+            ["ARG"] = 2,
+            ["FRA"] = 3,
+            ["ENG"] = 4,
+            ["BRA"] = 5,
+            ["POR"] = 6,
+            ["NED"] = 7,
+            ["BEL"] = 8,
+            ["GER"] = 9,
+            ["CRO"] = 10,
+            ["MAR"] = 11,
+            ["COL"] = 13,
+            ["URU"] = 16,
+            ["SUI"] = 17,
+            ["JPN"] = 18,
+            ["SEN"] = 19,
+            ["IRN"] = 20,
+            ["BIH"] = 21,
+            ["KOR"] = 22,
+            ["ECU"] = 23,
+            ["AUT"] = 24,
+            ["TUR"] = 25,
+            ["AUS"] = 26,
+            ["NOR"] = 29,
+            ["PAN"] = 30,
+            ["SWE"] = 33,
+            ["EGY"] = 34,
+            ["ALG"] = 35,
+            ["SCO"] = 36,
+            ["PAR"] = 39,
+            ["TUN"] = 40,
+            ["CIV"] = 42,
+            ["CZE"] = 28,
+            ["IRQ"] = 49,
+            ["UZB"] = 50,
+            ["QAT"] = 51,
+            ["COD"] = 56,
+            ["KSA"] = 60,
+            ["RSA"] = 61,
+            ["JOR"] = 66,
+            ["CPV"] = 68,
+            ["GHA"] = 72,
+            ["CUW"] = 82,
+            ["HAI"] = 84,
+            ["NZL"] = 86
+        };
+
     public static TeamCatalogEntry? Resolve(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -85,5 +138,13 @@ public static class TeamCatalog
     {
         var code = ResolveCode(value);
         return code is null ? null : TeamDisplay.GetFlagUrl(code);
+    }
+
+    public static int ResolveFifaRanking(string? value)
+    {
+        var code = ResolveCode(value);
+        return code is not null && FifaRanking2025.TryGetValue(code, out var rank)
+            ? rank
+            : int.MaxValue;
     }
 }
