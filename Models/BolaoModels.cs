@@ -326,6 +326,40 @@ public sealed class FullAuditPackage
     public SpecialAuditSnapshot? SpecialSnapshot { get; init; }
 }
 
+public sealed class ScoreAuditPackage
+{
+    public required Participant Participant { get; init; }
+    public required IReadOnlyList<ScoreAuditRound> Rounds { get; init; }
+    public required DateTimeOffset GeneratedAt { get; init; }
+    public required string ProofHash { get; init; }
+    public int TotalPoints => Rounds.Sum(round => round.TotalPoints);
+}
+
+public sealed class ScoreAuditRound
+{
+    public required PredictionRound Round { get; init; }
+    public required IReadOnlyList<ScoreAuditLine> Lines { get; init; }
+    public int TotalPoints => Lines.Sum(line => line.TotalPoints);
+}
+
+public sealed class ScoreAuditLine
+{
+    public required int OfficialNumber { get; init; }
+    public required string MatchLabel { get; init; }
+    public required string Status { get; init; }
+    public int? PredictionHomeGoals { get; init; }
+    public int? PredictionAwayGoals { get; init; }
+    public string? PredictionQualifiedTeam { get; init; }
+    public int? ResultHomeGoals { get; init; }
+    public int? ResultAwayGoals { get; init; }
+    public string? ResultQualifiedTeam { get; init; }
+    public int ExactScorePoints { get; init; }
+    public int ResultPoints { get; init; }
+    public int QualifiedPoints { get; init; }
+    public int BrazilMultiplier { get; init; } = 1;
+    public int TotalPoints { get; init; }
+}
+
 public sealed class PublicParticipantDto
 {
     public int Id { get; set; }

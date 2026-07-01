@@ -171,6 +171,24 @@
             </button>
         </div>
     </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Auditoria de pontuacao</h2>
+            <span>detalhamento de pontos por partida e rodada</span>
+        </div>
+
+        <p>O arquivo mostra cada jogo, o palpite, o resultado real, os criterios aplicados e os pontos somados. Rodadas incompletas tambem entram no PDF, com jogos pendentes marcados como aguardando resultado.</p>
+
+        <div class="form-actions">
+            <button type="button"
+                    class="btn-app secondary"
+                    data-fetch-download-url="@Url.Page("/Conta/Perfil", "DownloadScoreAudit")"
+                    data-loading-message="Gerando auditoria de pontuacao...">
+                Baixar auditoria de pontuacao
+            </button>
+        </div>
+    </article>
 </section>
 
 @section Scripts {

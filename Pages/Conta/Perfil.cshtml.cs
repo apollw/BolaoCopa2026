@@ -133,6 +133,20 @@ public class PerfilModel : PageModel
         return File(pdf, "application/pdf", fileName);
     }
 
+    public IActionResult OnGetDownloadScoreAudit()
+    {
+        var package = _auditImageService.BuildScoreAuditPackage(_repository.CurrentParticipantId);
+        if (package is null)
+        {
+            TempData["Status"] = "Auditoria de pontuacao indisponivel: nao ha rodadas cadastradas.";
+            return RedirectToPage();
+        }
+
+        var pdf = _auditImageService.RenderScoreAuditPdf(package);
+        var fileName = $"auditoria-pontuacao-{package.Participant.Id}.pdf";
+        return File(pdf, "application/pdf", fileName);
+    }
+
     private void LoadData()
     {
         Participant = _repository.CurrentParticipant;
