@@ -68,7 +68,7 @@ A senha administrativa deve ser configurada por `Admin__Password` no ambiente an
 
 - Placar exato vale 5 pontos.
 - Acerto do resultado vale 3 pontos.
-- Em mata-mata, acerto do classificado vale 2 pontos adicionais.
+- Em mata-mata, acerto do classificado vale 3 pontos adicionais.
 - Jogos do Brasil dobram a pontuacao.
 - Rodadas futuras respeitam desbloqueio progressivo.
 - Cada partida trava automaticamente no horario oficial de inicio.
