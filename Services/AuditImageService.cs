@@ -23,11 +23,13 @@ public sealed class AuditImageService : IDisposable
     private static readonly SKColor RowBorder = SKColor.Parse("#edf2e9");
 
     private readonly BolaoDbContext _db;
+    private readonly ScoringService _scoringService;
     private readonly SKTypeface _textTypeface;
 
-    public AuditImageService(BolaoDbContext db)
+    public AuditImageService(BolaoDbContext db, ScoringService scoringService)
     {
         _db = db;
+        _scoringService = scoringService;
         _textTypeface = ResolveTypeface();
     }
 
@@ -155,6 +157,74 @@ public sealed class AuditImageService : IDisposable
         return stream.ToArray();
     }
 
+    public ScoreAuditPackage? BuildScoreAuditPackage(int participantId)
+    {
+        var participant = _db.Participants.AsNoTracking().SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var rounds = _db.Rounds
+            .AsNoTracking()
+            .OrderBy(round => round.Id)
+            .ToList();
+        var matches = _db.Matches
+            .AsNoTracking()
+            .OrderBy(match => match.Kickoff)
+            .ThenBy(match => match.OfficialNumber)
+            .ToList();
+        var predictions = _db.Predictions
+            .AsNoTracking()
+            .Where(prediction => prediction.ParticipantId == participantId)
+            .ToDictionary(prediction => prediction.MatchId);
+
+        var auditRounds = rounds
+            .Select(round =>
+            {
+                var lines = matches
+                    .Where(match => match.RoundId == round.Id)
+                    .Select(match => BuildScoreAuditLine(match, predictions.GetValueOrDefault(match.Id)))
+                    .ToList();
+
+                return new ScoreAuditRound
+                {
+                    Round = round,
+                    Lines = lines
+                };
+            })
+            .Where(round => round.Lines.Count > 0)
+            .ToList();
+
+        if (auditRounds.Count == 0)
+        {
+            return null;
+        }
+
+        var generatedAt = DateTimeOffset.UtcNow;
+        return new ScoreAuditPackage
+        {
+            Participant = participant,
+            Rounds = auditRounds,
+            GeneratedAt = generatedAt,
+            ProofHash = BuildScoreAuditHash(participant, auditRounds, generatedAt)
+        };
+    }
+
+    public byte[] RenderScoreAuditPdf(ScoreAuditPackage package)
+    {
+        using var stream = new MemoryStream();
+        using var document = SKDocument.CreatePdf(stream);
+
+        foreach (var round in package.Rounds)
+        {
+            AddPdfPage(document, RenderScoreRoundPng(package, round));
+        }
+
+        document.Close();
+        return stream.ToArray();
+    }
+
     public SpecialAuditSnapshot? BuildSpecialSnapshot(int participantId)
     {
         var participant = _db.Participants.SingleOrDefault(item => item.Id == participantId);
@@ -208,6 +278,98 @@ public sealed class AuditImageService : IDisposable
             DrawRoundedBlock(canvas, new SKRect(64, 508, 1136, 566), SubtleFill, SubtleBorder);
             canvas.DrawText("Hash SHA-256 do comprovante", 86, 532, hashLabelPaint);
             canvas.DrawText(snapshot.ProofHash, 86, 558, hashPaint);
+        });
+    }
+
+    private ScoreAuditLine BuildScoreAuditLine(Match match, Prediction? prediction)
+    {
+        var score = prediction is null ? MatchScore.Empty : _scoringService.Score(match, prediction);
+        var hasResult = match.Result is not null;
+        var status = prediction is null
+            ? "Sem palpite"
+            : hasResult
+                ? "Pontuado"
+                : "Aguardando resultado real";
+
+        return new ScoreAuditLine
+        {
+            OfficialNumber = match.OfficialNumber,
+            MatchLabel = $"{match.HomeTeam.Name} x {match.AwayTeam.Name}",
+            Status = status,
+            PredictionHomeGoals = prediction?.HomeGoals,
+            PredictionAwayGoals = prediction?.AwayGoals,
+            PredictionQualifiedTeam = prediction is null ? null : ResolveQualifiedTeam(match, prediction.QualifiedTeamCode),
+            ResultHomeGoals = match.Result?.HomeGoals,
+            ResultAwayGoals = match.Result?.AwayGoals,
+            ResultQualifiedTeam = match.Result is null ? null : ResolveQualifiedTeam(match, match.Result.QualifiedTeamCode),
+            ExactScorePoints = score.ExactScore ? 5 : 0,
+            ResultPoints = !score.ExactScore && score.ResultHit ? 3 : 0,
+            QualifiedPoints = score.QualifiedHit ? 3 : 0,
+            BrazilMultiplier = match.IncludesBrazil ? 2 : 1,
+            TotalPoints = score.Points
+        };
+    }
+
+    private byte[] RenderScoreRoundPng(ScoreAuditPackage package, ScoreAuditRound round)
+    {
+        var width = 1500;
+        var rowHeight = 62;
+        var headerHeight = 270;
+        var footerHeight = 130;
+        var height = headerHeight + round.Lines.Count * rowHeight + footerHeight;
+
+        return RenderPng(width, height, canvas =>
+        {
+            DrawCard(canvas, width, height, 150);
+
+            using var brandPaint = CreateTextPaint(22, HeaderAccent, true);
+            using var titlePaint = CreateTextPaint(34, SKColors.White, true);
+            using var bodyPaint = CreateTextPaint(20, PrimaryText, true);
+            using var metaPaint = CreateTextPaint(18, SecondaryText);
+            using var tableHeaderPaint = CreateTextPaint(16, SecondaryText, true);
+            using var numberPaint = CreateTextPaint(16, PrimaryText, true);
+            using var rowPaint = CreateTextPaint(16, PrimaryText);
+            using var rowBoldPaint = CreateTextPaint(16, PrimaryText, true);
+            using var statusPaint = CreateTextPaint(14, SecondaryText);
+            using var hashLabelPaint = CreateTextPaint(16, SecondaryText, true);
+            using var hashPaint = CreateTextPaint(18, HeaderBackground, true);
+            using var dividerPaint = new SKPaint
+            {
+                IsAntialias = true,
+                Color = RowBorder,
+                StrokeWidth = 1
+            };
+
+            canvas.DrawText("Bolao Premier AEW", 64, 82, brandPaint);
+            canvas.DrawText("Auditoria de Pontuacao", 64, 128, titlePaint);
+            canvas.DrawText(TruncateText($"Participante: {package.Participant.Name} | Total geral: {package.TotalPoints} pts", bodyPaint, 1360), 64, 204, bodyPaint);
+            canvas.DrawText(TruncateText($"Rodada: {round.Round.Name} | Total da rodada: {round.TotalPoints} pts | Gerado: {FormatBrasilia(package.GeneratedAt)}", metaPaint, 1360), 64, 236, metaPaint);
+
+            canvas.DrawText("Jogo", 64, 282, tableHeaderPaint);
+            canvas.DrawText("Partida", 132, 282, tableHeaderPaint);
+            canvas.DrawText("Palpite", 468, 282, tableHeaderPaint);
+            canvas.DrawText("Resultado real", 704, 282, tableHeaderPaint);
+            canvas.DrawText("Criterios aplicados", 940, 282, tableHeaderPaint);
+            canvas.DrawText("Total", 1352, 282, tableHeaderPaint);
+
+            var y = 324f;
+            foreach (var line in round.Lines)
+            {
+                canvas.DrawLine(64, y - 28, 1436, y - 28, dividerPaint);
+                canvas.DrawText(line.OfficialNumber.ToString(), 64, y, numberPaint);
+                canvas.DrawText(TruncateText(line.MatchLabel, rowPaint, 305), 132, y, rowPaint);
+                canvas.DrawText(TruncateText(FormatPredictionScore(line), rowPaint, 205), 468, y, rowPaint);
+                canvas.DrawText(TruncateText(FormatResultScore(line), rowPaint, 205), 704, y, rowPaint);
+                canvas.DrawText(TruncateText(FormatScoreCriteria(line), rowPaint, 380), 940, y, rowPaint);
+                canvas.DrawText($"{line.TotalPoints} pts", 1352, y, rowBoldPaint);
+                canvas.DrawText(line.Status, 132, y + 22, statusPaint);
+                y += rowHeight;
+            }
+
+            var footerY = y + 18;
+            DrawRoundedBlock(canvas, new SKRect(64, footerY, 1436, footerY + 72), SubtleFill, SubtleBorder);
+            canvas.DrawText("Regras: exato +5 | resultado +3 | classificado +3 | jogos do Brasil dobram | mata-mata max. 8 antes da dobra", 86, footerY + 28, hashLabelPaint);
+            canvas.DrawText($"Hash SHA-256: {package.ProofHash}", 86, footerY + 58, hashPaint);
         });
     }
 
@@ -296,6 +458,24 @@ public sealed class AuditImageService : IDisposable
         return Convert.ToHexString(bytes);
     }
 
+    private static string BuildScoreAuditHash(Participant participant, IReadOnlyList<ScoreAuditRound> rounds, DateTimeOffset generatedAt)
+    {
+        var canonical = new StringBuilder();
+        canonical.AppendLine($"participant:{participant.Id}|{participant.Email}");
+        canonical.AppendLine($"generated:{generatedAt:O}");
+        foreach (var round in rounds.OrderBy(item => item.Round.Id))
+        {
+            canonical.AppendLine($"round:{round.Round.Id}|{round.Round.Name}|total:{round.TotalPoints}");
+            foreach (var line in round.Lines.OrderBy(item => item.OfficialNumber))
+            {
+                canonical.AppendLine($"{line.OfficialNumber}|{line.MatchLabel}|{line.PredictionHomeGoals?.ToString() ?? "-"}|{line.PredictionAwayGoals?.ToString() ?? "-"}|{line.PredictionQualifiedTeam ?? "-"}|{line.ResultHomeGoals?.ToString() ?? "-"}|{line.ResultAwayGoals?.ToString() ?? "-"}|{line.ResultQualifiedTeam ?? "-"}|{line.ExactScorePoints}|{line.ResultPoints}|{line.QualifiedPoints}|{line.BrazilMultiplier}|{line.TotalPoints}|{line.Status}");
+            }
+        }
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()));
+        return Convert.ToHexString(bytes);
+    }
+
     private static string? ResolveQualifiedTeam(Match match, string? qualifiedTeamCode)
     {
         return qualifiedTeamCode switch
@@ -305,6 +485,63 @@ public sealed class AuditImageService : IDisposable
             _ when qualifiedTeamCode == match.AwayTeam.Code => match.AwayTeam.Name,
             _ => qualifiedTeamCode
         };
+    }
+
+    private static string FormatPredictionScore(ScoreAuditLine line)
+    {
+        if (line.PredictionHomeGoals is null || line.PredictionAwayGoals is null)
+        {
+            return "-";
+        }
+
+        var qualified = string.IsNullOrWhiteSpace(line.PredictionQualifiedTeam)
+            ? string.Empty
+            : $" | classif.: {line.PredictionQualifiedTeam}";
+        return $"{line.PredictionHomeGoals} x {line.PredictionAwayGoals}{qualified}";
+    }
+
+    private static string FormatResultScore(ScoreAuditLine line)
+    {
+        if (line.ResultHomeGoals is null || line.ResultAwayGoals is null)
+        {
+            return "-";
+        }
+
+        var qualified = string.IsNullOrWhiteSpace(line.ResultQualifiedTeam)
+            ? string.Empty
+            : $" | classif.: {line.ResultQualifiedTeam}";
+        return $"{line.ResultHomeGoals} x {line.ResultAwayGoals}{qualified}";
+    }
+
+    private static string FormatScoreCriteria(ScoreAuditLine line)
+    {
+        if (line.TotalPoints == 0)
+        {
+            return "-";
+        }
+
+        var parts = new List<string>();
+        if (line.ExactScorePoints > 0)
+        {
+            parts.Add($"exato +{line.ExactScorePoints}");
+        }
+
+        if (line.ResultPoints > 0)
+        {
+            parts.Add($"resultado +{line.ResultPoints}");
+        }
+
+        if (line.QualifiedPoints > 0)
+        {
+            parts.Add($"classificado +{line.QualifiedPoints}");
+        }
+
+        if (line.BrazilMultiplier > 1)
+        {
+            parts.Add($"Brasil x{line.BrazilMultiplier}");
+        }
+
+        return string.Join(" | ", parts);
     }
 
     private static byte[] RenderPng(int width, int height, Action<SKCanvas> draw)
