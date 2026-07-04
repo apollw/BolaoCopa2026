@@ -1308,7 +1308,7 @@ public sealed class BolaoRepository
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
             .FirstOrDefault();
 
-        return firstKickoff?.AddHours(-4);
+        return firstKickoff?.AddHours(-2);
     }
 
     private bool IsRoundDraftLocked(int roundId, out string? reason, DateTimeOffset? now = null)
@@ -1322,7 +1322,7 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites desta rodada travaram 4h antes da primeira partida ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites desta rodada travaram 2h antes da primeira partida ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 
@@ -1384,32 +1384,32 @@ public sealed class BolaoRepository
             },
             CompetitionPhase.RoundOf16 => match.OfficialNumber switch
             {
-                89 => "W73 x W75",
-                90 => "W74 x W77",
-                91 => "W76 x W78",
-                92 => "W79 x W80",
-                93 => "W83 x W84",
-                94 => "W81 x W82",
-                95 => "W86 x W88",
-                96 => "W85 x W87",
+                89 => "Oitavas 1",
+                90 => "Oitavas 2",
+                93 => "Oitavas 3",
+                94 => "Oitavas 4",
+                91 => "Oitavas 5",
+                92 => "Oitavas 6",
+                95 => "Oitavas 7",
+                96 => "Oitavas 8",
                 _ => match.OfficialNumber.ToString()
             },
             CompetitionPhase.QuarterFinal => match.OfficialNumber switch
             {
-                97 => "W89 x W90",
-                98 => "W93 x W94",
-                99 => "W91 x W92",
-                100 => "W95 x W96",
+                97 => "Venc. Oitavas 1 x Venc. Oitavas 2",
+                98 => "Venc. Oitavas 3 x Venc. Oitavas 4",
+                99 => "Venc. Oitavas 5 x Venc. Oitavas 6",
+                100 => "Venc. Oitavas 7 x Venc. Oitavas 8",
                 _ => match.OfficialNumber.ToString()
             },
             CompetitionPhase.SemiFinal => match.OfficialNumber switch
             {
-                101 => "W97 x W98",
-                102 => "W99 x W100",
+                101 => "Venc. Quartas 1 x Venc. Quartas 2",
+                102 => "Venc. Quartas 3 x Venc. Quartas 4",
                 _ => match.OfficialNumber.ToString()
             },
-            CompetitionPhase.ThirdPlace => "L101 x L102",
-            CompetitionPhase.Final => "W101 x W102",
+            CompetitionPhase.ThirdPlace => "Perd. Semifinal 1 x Perd. Semifinal 2",
+            CompetitionPhase.Final => "Venc. Semifinal 1 x Venc. Semifinal 2",
             _ => match.Phase.ToString()
         };
     }
