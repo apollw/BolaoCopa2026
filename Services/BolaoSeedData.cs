@@ -18,6 +18,7 @@ public static class BolaoSeedData
         {
             EnsureMissingMatches(db);
             EnsureOfficialRoundOf32Matches(db);
+            EnsureOfficialKnockoutSchedule(db);
             return;
         }
 
@@ -25,6 +26,7 @@ public static class BolaoSeedData
         db.Matches.AddRange(SeedMatches());
 
         db.SaveChanges();
+        EnsureOfficialKnockoutSchedule(db);
     }
 
     private static void EnsureParticipantAvatarImageColumn(BolaoDbContext db)
@@ -97,6 +99,23 @@ public static class BolaoSeedData
         if (changed)
         {
             db.SaveChanges();
+        }
+    }
+
+    private static void EnsureOfficialKnockoutSchedule(BolaoDbContext db)
+    {
+        var officialSchedule = SeedMatches()
+            .Where(match => match.OfficialNumber >= 89 && match.OfficialNumber <= 104)
+            .ToDictionary(match => match.OfficialNumber);
+
+        foreach (var match in officialSchedule.Values)
+        {
+            db.Database.ExecuteSqlInterpolated($"""
+                UPDATE "Matches"
+                SET "Kickoff" = {match.Kickoff},
+                    "Venue" = {match.Venue}
+                WHERE "OfficialNumber" = {match.OfficialNumber};
+                """);
         }
     }
 
@@ -301,39 +320,39 @@ public static class BolaoSeedData
             });
         }
 
-        Add(73, 4, CompetitionPhase.RoundOf32, "2026-06-29", "GER", "PAR", "Boston", 17, 30);
-        Add(74, 4, CompetitionPhase.RoundOf32, "2026-06-30", "FRA", "SWE", "Nova Jersey", 18);
-        Add(75, 4, CompetitionPhase.RoundOf32, "2026-06-28", "RSA", "CAN", "Los Angeles", 16);
-        Add(76, 4, CompetitionPhase.RoundOf32, "2026-06-29", "NED", "MAR", "El Gigante de Acero", 22);
-        Add(77, 4, CompetitionPhase.RoundOf32, "2026-07-02", "POR", "CRO", "Toronto Field", 20);
-        Add(78, 4, CompetitionPhase.RoundOf32, "2026-07-02", "ESP", "AUT", "Los Angeles", 16);
-        Add(79, 4, CompetitionPhase.RoundOf32, "2026-07-01", "USA", "BIH", "Santa Clara", 21);
-        Add(80, 4, CompetitionPhase.RoundOf32, "2026-07-01", "BEL", "SEN", "Seattle Field", 17);
-        Add(81, 4, CompetitionPhase.RoundOf32, "2026-06-29", "BRA", "JPN", "Houston", 14);
-        Add(82, 4, CompetitionPhase.RoundOf32, "2026-06-30", "CIV", "NOR", "Dallas", 14);
-        Add(83, 4, CompetitionPhase.RoundOf32, "2026-06-30", "MEX", "ECU", "Azteca", 22);
-        Add(84, 4, CompetitionPhase.RoundOf32, "2026-07-01", "ENG", "COD", "Atlanta", 13);
-        Add(85, 4, CompetitionPhase.RoundOf32, "2026-07-03", "ARG", "CPV", "Miami", 19);
-        Add(86, 4, CompetitionPhase.RoundOf32, "2026-07-03", "AUS", "EGY", "Dallas", 15);
-        Add(87, 4, CompetitionPhase.RoundOf32, "2026-07-03", "SUI", "ALG", "Vancouver Place", 0);
-        Add(88, 4, CompetitionPhase.RoundOf32, "2026-07-03", "COL", "GHA", "Kansas City", 22, 30);
+        Add(73, 4, CompetitionPhase.RoundOf32, "2026-06-28", "RSA", "CAN", "Los Angeles", 16);
+        Add(74, 4, CompetitionPhase.RoundOf32, "2026-06-29", "GER", "PAR", "Boston", 17, 30);
+        Add(75, 4, CompetitionPhase.RoundOf32, "2026-06-29", "NED", "MAR", "El Gigante de Acero", 22);
+        Add(76, 4, CompetitionPhase.RoundOf32, "2026-06-29", "BRA", "JPN", "Houston", 14);
+        Add(77, 4, CompetitionPhase.RoundOf32, "2026-06-30", "FRA", "SWE", "Nova Jersey", 18);
+        Add(78, 4, CompetitionPhase.RoundOf32, "2026-06-30", "CIV", "NOR", "Dallas", 14);
+        Add(79, 4, CompetitionPhase.RoundOf32, "2026-06-30", "MEX", "ECU", "Azteca", 22);
+        Add(80, 4, CompetitionPhase.RoundOf32, "2026-07-01", "ENG", "COD", "Atlanta", 13);
+        Add(81, 4, CompetitionPhase.RoundOf32, "2026-07-01", "USA", "BIH", "Santa Clara", 21);
+        Add(82, 4, CompetitionPhase.RoundOf32, "2026-07-01", "BEL", "SEN", "Seattle Field", 17);
+        Add(83, 4, CompetitionPhase.RoundOf32, "2026-07-02", "POR", "CRO", "Toronto Field", 20);
+        Add(84, 4, CompetitionPhase.RoundOf32, "2026-07-02", "ESP", "AUT", "Los Angeles", 16);
+        Add(85, 4, CompetitionPhase.RoundOf32, "2026-07-03", "SUI", "ALG", "Vancouver Place", 0);
+        Add(86, 4, CompetitionPhase.RoundOf32, "2026-07-03", "ARG", "CPV", "Miami", 19);
+        Add(87, 4, CompetitionPhase.RoundOf32, "2026-07-03", "COL", "GHA", "Kansas City", 22, 30);
+        Add(88, 4, CompetitionPhase.RoundOf32, "2026-07-03", "AUS", "EGY", "Dallas", 15);
 
-        Add(89, 5, CompetitionPhase.RoundOf16, "2026-07-04", "W73", "W75", "Philadelphia Stadium");
-        Add(90, 5, CompetitionPhase.RoundOf16, "2026-07-04", "W74", "W77", "Houston Stadium", 19);
-        Add(91, 5, CompetitionPhase.RoundOf16, "2026-07-05", "W76", "W78", "New York New Jersey Stadium");
-        Add(92, 5, CompetitionPhase.RoundOf16, "2026-07-05", "W79", "W80", "Mexico City Stadium", 19);
-        Add(93, 5, CompetitionPhase.RoundOf16, "2026-07-06", "W83", "W84", "Dallas Stadium");
-        Add(94, 5, CompetitionPhase.RoundOf16, "2026-07-06", "W81", "W82", "Seattle Stadium", 19);
-        Add(95, 5, CompetitionPhase.RoundOf16, "2026-07-07", "W86", "W88", "Atlanta Stadium");
-        Add(96, 5, CompetitionPhase.RoundOf16, "2026-07-07", "W85", "W87", "BC Place Vancouver", 19);
-        Add(97, 6, CompetitionPhase.QuarterFinal, "2026-07-09", "W89", "W90", "Gillette Stadium");
-        Add(98, 6, CompetitionPhase.QuarterFinal, "2026-07-10", "W93", "W94", "SoFi Stadium");
-        Add(99, 6, CompetitionPhase.QuarterFinal, "2026-07-11", "W91", "W92", "Kansas City Stadium");
-        Add(100, 6, CompetitionPhase.QuarterFinal, "2026-07-11", "W95", "W96", "Miami Stadium", 19);
-        Add(101, 7, CompetitionPhase.SemiFinal, "2026-07-14", "W97", "W98", "Dallas Stadium");
-        Add(102, 7, CompetitionPhase.SemiFinal, "2026-07-15", "W99", "W100", "Atlanta Stadium");
-        Add(103, 8, CompetitionPhase.ThirdPlace, "2026-07-18", "L101", "L102", "Miami Stadium");
-        Add(104, 8, CompetitionPhase.Final, "2026-07-19", "W101", "W102", "New York New Jersey Stadium");
+        Add(89, 5, CompetitionPhase.RoundOf16, "2026-07-04", "PAR", "FRA", "Filadelfia", 18);
+        Add(90, 5, CompetitionPhase.RoundOf16, "2026-07-04", "CAN", "MAR", "Houston", 14);
+        Add(91, 5, CompetitionPhase.RoundOf16, "2026-07-05", "BRA", "NOR", "Nova Jersey", 17);
+        Add(92, 5, CompetitionPhase.RoundOf16, "2026-07-05", "MEX", "ENG", "Azteca", 21);
+        Add(93, 5, CompetitionPhase.RoundOf16, "2026-07-06", "POR", "ESP", "Dallas", 16);
+        Add(94, 5, CompetitionPhase.RoundOf16, "2026-07-06", "USA", "BEL", "Seattle Field", 21);
+        Add(95, 5, CompetitionPhase.RoundOf16, "2026-07-07", "ARG", "EGY", "Atlanta", 13);
+        Add(96, 5, CompetitionPhase.RoundOf16, "2026-07-07", "SUI", "COL", "Vancouver Place", 17);
+        Add(97, 6, CompetitionPhase.QuarterFinal, "2026-07-09", "W89", "W90", "Boston", 17);
+        Add(98, 6, CompetitionPhase.QuarterFinal, "2026-07-10", "W93", "W94", "Los Angeles");
+        Add(99, 6, CompetitionPhase.QuarterFinal, "2026-07-11", "W91", "W92", "Miami", 18);
+        Add(100, 6, CompetitionPhase.QuarterFinal, "2026-07-11", "W95", "W96", "Kansas City", 22);
+        Add(101, 7, CompetitionPhase.SemiFinal, "2026-07-14", "W97", "W98", "Dallas");
+        Add(102, 7, CompetitionPhase.SemiFinal, "2026-07-15", "W99", "W100", "Atlanta");
+        Add(103, 8, CompetitionPhase.ThirdPlace, "2026-07-18", "L101", "L102", "Miami", 18);
+        Add(104, 8, CompetitionPhase.Final, "2026-07-19", "W101", "W102", "Nova Jersey");
 
         return id;
     }

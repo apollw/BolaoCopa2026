@@ -662,7 +662,7 @@
                             <span>@TeamDisplay.GetName(match.AwayTeam)</span>
                         </span>
                     </strong>
-                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM HH:mm")</span>
+                    <span>@match.Phase - @match.Kickoff.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm")</span>
                 </div>
                 @if (match.IncludesBrazil)
                 {

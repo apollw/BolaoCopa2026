@@ -44,7 +44,7 @@
                             <span>@TeamDisplay.GetName(match.AwayTeam)</span>
                         </span>
                     </strong>
-                    <span>@match.Phase - @match.Kickoff.ToString("dd/MM/yyyy HH:mm")</span>
+                    <span>@match.Phase - @match.Kickoff.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm")</span>
                 </div>
                 <form method="post" class="score-form" onsubmit="return confirm('Confirmar resultado oficial? Depois de registrado, nao sera possivel editar esta partida.');">
                     <input type="hidden" name="matchId" value="@match.Id" />

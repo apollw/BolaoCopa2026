@@ -302,9 +302,9 @@ public sealed class AuditImageService : IDisposable
             ResultHomeGoals = match.Result?.HomeGoals,
             ResultAwayGoals = match.Result?.AwayGoals,
             ResultQualifiedTeam = match.Result is null ? null : ResolveQualifiedTeam(match, match.Result.QualifiedTeamCode),
-            ExactScorePoints = score.ExactScore ? 5 : 0,
-            ResultPoints = !score.ExactScore && score.ResultHit ? 3 : 0,
-            QualifiedPoints = score.QualifiedHit ? 3 : 0,
+            ExactScorePoints = score.ExactScorePoints,
+            ResultPoints = score.ResultPoints,
+            QualifiedPoints = score.QualifiedPoints,
             BrazilMultiplier = match.IncludesBrazil ? 2 : 1,
             TotalPoints = score.Points
         };
