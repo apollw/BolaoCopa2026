@@ -18,32 +18,78 @@ public sealed class ScoringService
             && !string.IsNullOrWhiteSpace(prediction.QualifiedTeamCode)
             && prediction.QualifiedTeamCode == result.QualifiedTeamCode;
 
-        var points = 0;
+        var exactScorePoints = 0;
+        var resultPoints = 0;
+        var qualifiedPoints = 0;
         if (exactScore)
         {
-            points += 5;
+            exactScorePoints = GetExactScorePoints(match.Phase);
         }
         else if (resultHit)
         {
-            points += 3;
+            resultPoints = GetResultPoints(match.Phase);
         }
 
         if (qualifiedHit)
         {
-            points += 3;
+            qualifiedPoints = GetQualifiedPoints(match.Phase);
         }
 
-        if (match.IsKnockout)
-        {
-            points = Math.Min(points, 8);
-        }
-
+        var basePoints = exactScorePoints + resultPoints + qualifiedPoints;
+        var points = basePoints;
         if (match.IncludesBrazil)
         {
             points *= 2;
         }
 
-        return new MatchScore(points, exactScore, resultHit, qualifiedHit, match.IncludesBrazil && (exactScore || resultHit || qualifiedHit));
+        return new MatchScore(
+            points,
+            exactScore,
+            resultHit,
+            qualifiedHit,
+            match.IncludesBrazil && basePoints > 0,
+            exactScorePoints,
+            resultPoints,
+            qualifiedPoints);
+    }
+
+    private static int GetExactScorePoints(CompetitionPhase phase)
+    {
+        return phase switch
+        {
+            CompetitionPhase.RoundOf16 => 7,
+            CompetitionPhase.QuarterFinal => 9,
+            CompetitionPhase.SemiFinal => 11,
+            CompetitionPhase.ThirdPlace => 11,
+            CompetitionPhase.Final => 13,
+            _ => 5
+        };
+    }
+
+    private static int GetResultPoints(CompetitionPhase phase)
+    {
+        return phase switch
+        {
+            CompetitionPhase.RoundOf16 => 4,
+            CompetitionPhase.QuarterFinal => 5,
+            CompetitionPhase.SemiFinal => 6,
+            CompetitionPhase.ThirdPlace => 6,
+            CompetitionPhase.Final => 7,
+            _ => 3
+        };
+    }
+
+    private static int GetQualifiedPoints(CompetitionPhase phase)
+    {
+        return phase switch
+        {
+            CompetitionPhase.RoundOf16 => 4,
+            CompetitionPhase.QuarterFinal => 5,
+            CompetitionPhase.SemiFinal => 6,
+            CompetitionPhase.ThirdPlace => 6,
+            CompetitionPhase.Final => 7,
+            _ => 3
+        };
     }
 
     private static MatchOutcome GetOutcome(int homeGoals, int awayGoals)
@@ -62,7 +108,10 @@ public sealed record MatchScore(
     bool ExactScore,
     bool ResultHit,
     bool QualifiedHit,
-    bool BrazilHit)
+    bool BrazilHit,
+    int ExactScorePoints,
+    int ResultPoints,
+    int QualifiedPoints)
 {
-    public static MatchScore Empty { get; } = new(0, false, false, false, false);
+    public static MatchScore Empty { get; } = new(0, false, false, false, false, 0, 0, 0);
 }
