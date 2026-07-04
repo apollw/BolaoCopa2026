@@ -1308,7 +1308,7 @@ public sealed class BolaoRepository
             .Select(match => (DateTimeOffset?)match.Kickoff.ToUniversalTime())
             .FirstOrDefault();
 
-        return firstKickoff?.AddHours(-2);
+        return firstKickoff;
     }
 
     private bool IsRoundDraftLocked(int roundId, out string? reason, DateTimeOffset? now = null)
@@ -1322,7 +1322,7 @@ public sealed class BolaoRepository
 
         if ((now ?? DateTimeOffset.UtcNow) >= lockTime.Value)
         {
-            reason = $"Os palpites desta rodada travaram 2h antes da primeira partida ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
+            reason = $"Os palpites desta rodada travaram no inicio da primeira partida ({lockTime.Value.ToOffset(TimeSpan.FromHours(-3)):dd/MM HH:mm}).";
             return true;
         }
 
