@@ -1551,27 +1551,27 @@ public sealed class BolaoRepository
     private void TryApplyKnockoutPairings()
     {
         var changed = false;
-        var pairings = new Dictionary<int, (Team Home, Team Away)>
+        var fixedRoundOf32Pairings = new Dictionary<int, (Team Home, Team Away)>
         {
-            [73] = (ResolveCatalogTeam("GER"), ResolveCatalogTeam("PAR")),
-            [74] = (ResolveCatalogTeam("FRA"), ResolveCatalogTeam("SWE")),
-            [75] = (ResolveCatalogTeam("RSA"), ResolveCatalogTeam("CAN")),
-            [76] = (ResolveCatalogTeam("NED"), ResolveCatalogTeam("MAR")),
-            [77] = (ResolveCatalogTeam("POR"), ResolveCatalogTeam("CRO")),
-            [78] = (ResolveCatalogTeam("ESP"), ResolveCatalogTeam("AUT")),
-            [79] = (ResolveCatalogTeam("USA"), ResolveCatalogTeam("BIH")),
-            [80] = (ResolveCatalogTeam("BEL"), ResolveCatalogTeam("SEN")),
-            [81] = (ResolveCatalogTeam("BRA"), ResolveCatalogTeam("JPN")),
-            [82] = (ResolveCatalogTeam("CIV"), ResolveCatalogTeam("NOR")),
-            [83] = (ResolveCatalogTeam("MEX"), ResolveCatalogTeam("ECU")),
-            [84] = (ResolveCatalogTeam("ENG"), ResolveCatalogTeam("COD")),
-            [85] = (ResolveCatalogTeam("ARG"), ResolveCatalogTeam("CPV")),
-            [86] = (ResolveCatalogTeam("AUS"), ResolveCatalogTeam("EGY")),
-            [87] = (ResolveCatalogTeam("SUI"), ResolveCatalogTeam("ALG")),
-            [88] = (ResolveCatalogTeam("COL"), ResolveCatalogTeam("GHA"))
+            [73] = (ResolveCatalogTeam("RSA"), ResolveCatalogTeam("CAN")),
+            [74] = (ResolveCatalogTeam("GER"), ResolveCatalogTeam("PAR")),
+            [75] = (ResolveCatalogTeam("NED"), ResolveCatalogTeam("MAR")),
+            [76] = (ResolveCatalogTeam("BRA"), ResolveCatalogTeam("JPN")),
+            [77] = (ResolveCatalogTeam("FRA"), ResolveCatalogTeam("SWE")),
+            [78] = (ResolveCatalogTeam("CIV"), ResolveCatalogTeam("NOR")),
+            [79] = (ResolveCatalogTeam("MEX"), ResolveCatalogTeam("ECU")),
+            [80] = (ResolveCatalogTeam("ENG"), ResolveCatalogTeam("COD")),
+            [81] = (ResolveCatalogTeam("USA"), ResolveCatalogTeam("BIH")),
+            [82] = (ResolveCatalogTeam("BEL"), ResolveCatalogTeam("SEN")),
+            [83] = (ResolveCatalogTeam("POR"), ResolveCatalogTeam("CRO")),
+            [84] = (ResolveCatalogTeam("ESP"), ResolveCatalogTeam("AUT")),
+            [85] = (ResolveCatalogTeam("SUI"), ResolveCatalogTeam("ALG")),
+            [86] = (ResolveCatalogTeam("ARG"), ResolveCatalogTeam("CPV")),
+            [87] = (ResolveCatalogTeam("COL"), ResolveCatalogTeam("GHA")),
+            [88] = (ResolveCatalogTeam("AUS"), ResolveCatalogTeam("EGY"))
         };
 
-        foreach (var (officialNumber, pairing) in pairings)
+        foreach (var (officialNumber, pairing) in fixedRoundOf32Pairings)
         {
             var match = _db.Matches.SingleOrDefault(item => item.OfficialNumber == officialNumber);
             if (match is null || match.Result is not null)
@@ -1589,10 +1589,115 @@ public sealed class BolaoRepository
             changed = true;
         }
 
+        var fixedRoundOf16Pairings = new Dictionary<int, (Team Home, Team Away)>
+        {
+            [89] = (ResolveCatalogTeam("PAR"), ResolveCatalogTeam("FRA")),
+            [90] = (ResolveCatalogTeam("CAN"), ResolveCatalogTeam("MAR")),
+            [91] = (ResolveCatalogTeam("BRA"), ResolveCatalogTeam("NOR")),
+            [92] = (ResolveCatalogTeam("MEX"), ResolveCatalogTeam("ENG")),
+            [93] = (ResolveCatalogTeam("POR"), ResolveCatalogTeam("ESP")),
+            [94] = (ResolveCatalogTeam("USA"), ResolveCatalogTeam("BEL")),
+            [95] = (ResolveCatalogTeam("ARG"), ResolveCatalogTeam("EGY")),
+            [96] = (ResolveCatalogTeam("SUI"), ResolveCatalogTeam("COL"))
+        };
+
+        foreach (var (officialNumber, pairing) in fixedRoundOf16Pairings)
+        {
+            var match = _db.Matches.SingleOrDefault(item => item.OfficialNumber == officialNumber);
+            if (match is null || match.Result is not null)
+            {
+                continue;
+            }
+
+            if (match.HomeTeam.Code == pairing.Home.Code && match.AwayTeam.Code == pairing.Away.Code)
+            {
+                continue;
+            }
+
+            match.HomeTeam = pairing.Home;
+            match.AwayTeam = pairing.Away;
+            changed = true;
+        }
+
+        var matchesByOfficialNumber = _db.Matches
+            .Where(match => match.OfficialNumber >= 73 && match.OfficialNumber <= 104)
+            .ToDictionary(match => match.OfficialNumber);
+        var knockoutPairings = new Dictionary<int, (string Home, string Away)>
+        {
+            [97] = ("W89", "W90"),
+            [98] = ("W93", "W94"),
+            [99] = ("W91", "W92"),
+            [100] = ("W95", "W96"),
+            [101] = ("W97", "W98"),
+            [102] = ("W99", "W100"),
+            [103] = ("L101", "L102"),
+            [104] = ("W101", "W102")
+        };
+
+        foreach (var (officialNumber, pairing) in knockoutPairings)
+        {
+            if (!matchesByOfficialNumber.TryGetValue(officialNumber, out var match) || match.Result is not null)
+            {
+                continue;
+            }
+
+            var homeTeam = ResolveKnockoutToken(pairing.Home, matchesByOfficialNumber);
+            var awayTeam = ResolveKnockoutToken(pairing.Away, matchesByOfficialNumber);
+            if (homeTeam is null || awayTeam is null)
+            {
+                continue;
+            }
+
+            if (match.HomeTeam.Code == homeTeam.Code && match.AwayTeam.Code == awayTeam.Code)
+            {
+                continue;
+            }
+
+            match.HomeTeam = homeTeam;
+            match.AwayTeam = awayTeam;
+            changed = true;
+        }
+
         if (changed)
         {
             _db.SaveChanges();
         }
+    }
+
+    private static Team? ResolveKnockoutToken(string token, IReadOnlyDictionary<int, Match> matchesByOfficialNumber)
+    {
+        if (token.Length < 2 || !int.TryParse(token[1..], out var officialNumber))
+        {
+            return null;
+        }
+
+        if (!matchesByOfficialNumber.TryGetValue(officialNumber, out var sourceMatch) || sourceMatch.Result is null)
+        {
+            return null;
+        }
+
+        var qualifiedCode = sourceMatch.Result.QualifiedTeamCode;
+        var winner = qualifiedCode switch
+        {
+            _ when qualifiedCode == sourceMatch.HomeTeam.Code => sourceMatch.HomeTeam,
+            _ when qualifiedCode == sourceMatch.AwayTeam.Code => sourceMatch.AwayTeam,
+            _ => null
+        };
+
+        if (winner is null)
+        {
+            return null;
+        }
+
+        var resolved = token[0] switch
+        {
+            'W' => winner,
+            'L' when winner.Code == sourceMatch.HomeTeam.Code => sourceMatch.AwayTeam,
+            'L' when winner.Code == sourceMatch.AwayTeam.Code => sourceMatch.HomeTeam,
+            _ => null
+        };
+
+        return resolved is null ? null : new Team(resolved.Code, resolved.Name, resolved.IsBrazil);
     }
 
     private static Team ResolveCatalogTeam(string teamCode)
