@@ -14,12 +14,14 @@ public class UsuariosModel : PageModel
     private readonly BolaoRepository _repository;
     private readonly BolaoDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly AuditImageService _auditImageService;
 
-    public UsuariosModel(BolaoRepository repository, BolaoDbContext db, IWebHostEnvironment environment)
+    public UsuariosModel(BolaoRepository repository, BolaoDbContext db, IWebHostEnvironment environment, AuditImageService auditImageService)
     {
         _repository = repository;
         _db = db;
         _environment = environment;
+        _auditImageService = auditImageService;
     }
 
     public IReadOnlyList<AdminParticipantSummary> Participants { get; private set; } = [];
@@ -49,6 +51,20 @@ public class UsuariosModel : PageModel
         DeleteAvatarFile(participant.AvatarImagePath);
         TempData["Status"] = $"Usuario {participant.Name} e todos os dados vinculados foram excluidos.";
         return RedirectToPage();
+    }
+
+    public IActionResult OnGetDownloadFinalCardPreview(int participantId)
+    {
+        var package = _auditImageService.BuildFinalCardPackage(participantId, allowPartial: true);
+        if (package is null)
+        {
+            TempData["Status"] = "Nao foi possivel gerar o card deste participante.";
+            return RedirectToPage();
+        }
+
+        var image = _auditImageService.RenderFinalCardPng(package);
+        var fileName = $"card-preview-{package.Participant.Id}.png";
+        return File(image, "image/png", fileName);
     }
 
     private void LoadData()

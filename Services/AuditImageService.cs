@@ -107,6 +107,88 @@ public sealed class AuditImageService : IDisposable
         _db.SaveChanges();
     }
 
+    public bool IsBolaoComplete()
+    {
+        var totalMatches = _db.Matches.Count();
+        return totalMatches > 0 && _db.Matches.Count(match => match.Result != null) == totalMatches;
+    }
+
+    public FinalCardPackage? BuildFinalCardPackage(int participantId, bool allowPartial = false)
+    {
+        var participant = _db.Participants.AsNoTracking().SingleOrDefault(item => item.Id == participantId);
+        if (participant is null)
+        {
+            return null;
+        }
+
+        var matches = _db.Matches.AsNoTracking().ToList();
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var completedMatches = matches.Count(match => match.Result is not null);
+        var isComplete = completedMatches == matches.Count;
+        if (!isComplete && !allowPartial)
+        {
+            return null;
+        }
+
+        var participants = _db.Participants
+            .AsNoTracking()
+            .Where(item => !item.IsAdmin)
+            .OrderBy(item => item.Name)
+            .ToList();
+        var predictions = _db.Predictions.AsNoTracking().ToList();
+        var matchesById = matches.ToDictionary(match => match.Id);
+        var ranking = BuildFinalCardRanking(participants, matchesById, predictions);
+        var rankingEntry = ranking.SingleOrDefault(entry => entry.Participant.Id == participantId);
+        if (rankingEntry is null)
+        {
+            return null;
+        }
+
+        var placement = ranking
+            .Select((entry, index) => new { entry.Participant.Id, Index = index })
+            .First(item => item.Id == participantId)
+            .Index + 1;
+        var roundsById = _db.Rounds.AsNoTracking().ToDictionary(round => round.Id);
+        var bestRound = predictions
+            .Where(prediction => prediction.ParticipantId == participantId && matchesById.ContainsKey(prediction.MatchId))
+            .GroupBy(prediction => matchesById[prediction.MatchId].RoundId)
+            .Select(group => new
+            {
+                RoundId = group.Key,
+                Points = group.Sum(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction).Points)
+            })
+            .OrderByDescending(item => item.Points)
+            .ThenBy(item => item.RoundId)
+            .FirstOrDefault();
+
+        var bestRoundLabel = bestRound is null || bestRound.Points == 0
+            ? "Melhor rodada ainda indefinida"
+            : $"{roundsById.GetValueOrDefault(bestRound.RoundId)?.Name ?? $"Rodada {bestRound.RoundId}"}: {bestRound.Points} pts";
+        var curiosityLabel = rankingEntry.ExactScores > 0
+            ? $"Cravou {rankingEntry.ExactScores} placar(es) exato(s)"
+            : $"Acertou {rankingEntry.ResultHits} resultado(s)";
+
+        return new FinalCardPackage
+        {
+            Participant = participant,
+            Ranking = rankingEntry,
+            StatusLabel = isComplete ? "Card final do Bolao" : "Previa parcial do card",
+            BestRoundLabel = bestRoundLabel,
+            CuriosityLabel = curiosityLabel,
+            Placement = placement,
+            ParticipantCount = ranking.Count,
+            CompletedMatches = completedMatches,
+            TotalMatches = matches.Count,
+            IsComplete = isComplete,
+            IsChampion = isComplete && placement == 1,
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+    }
+
     public FullAuditPackage? BuildFullAuditPackage(int participantId)
     {
         var participant = _db.Participants.AsNoTracking().SingleOrDefault(item => item.Id == participantId);
@@ -244,6 +326,76 @@ public sealed class AuditImageService : IDisposable
         };
     }
 
+    public byte[] RenderFinalCardPng(FinalCardPackage package)
+    {
+        var width = 1200;
+        var height = 675;
+        var title = package.IsChampion ? "Campeao do Bolao Premier AEW" : package.StatusLabel;
+        var headerColor = package.IsChampion ? SKColor.Parse("#8a5f00") : HeaderBackground;
+        var accentColor = package.IsChampion ? SKColor.Parse("#ffe08a") : HeaderAccent;
+
+        return RenderPng(width, height, canvas =>
+        {
+            DrawCard(canvas, width, height, 178);
+
+            using var headerPaint = new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Fill,
+                Color = headerColor
+            };
+            canvas.DrawRoundRect(new SKRoundRect(new SKRect(32, 32, width - 32, 210), 8, 8), headerPaint);
+
+            using var accentPaint = new SKPaint
+            {
+                IsAntialias = true,
+                Style = SKPaintStyle.Fill,
+                Color = accentColor
+            };
+            canvas.DrawCircle(1040, 120, 58, accentPaint);
+
+            using var brandPaint = CreateTextPaint(22, accentColor, true);
+            using var titlePaint = CreateTextPaint(42, SKColors.White, true);
+            using var subtitlePaint = CreateTextPaint(20, SKColor.Parse("#f6ecd0"));
+            using var badgePaint = CreateTextPaint(38, headerColor, true);
+            using var namePaint = CreateTextPaint(34, PrimaryText, true);
+            using var labelPaint = CreateTextPaint(17, SecondaryText, true);
+            using var valuePaint = CreateTextPaint(30, HeaderBackground, true);
+            using var bodyPaint = CreateTextPaint(21, PrimaryText, true);
+            using var metaPaint = CreateTextPaint(16, SecondaryText);
+
+            canvas.DrawText("Bolao Premier AEW", 64, 82, brandPaint);
+            canvas.DrawText(TruncateText(title, titlePaint, 820), 64, 132, titlePaint);
+            canvas.DrawText($"{package.CompletedMatches}/{package.TotalMatches} jogos computados | {FormatBrasilia(package.GeneratedAt)}", 64, 170, subtitlePaint);
+            canvas.DrawText(package.IsChampion ? "1" : $"#{package.Placement}", 1005, 136, badgePaint);
+
+            canvas.DrawText(TruncateText(package.Participant.Name, namePaint, 940), 64, 278, namePaint);
+            canvas.DrawText($"{package.Placement} de {package.ParticipantCount} participantes", 64, 316, bodyPaint);
+
+            DrawFinalMetric(canvas, 64, 362, "Pontos", package.Ranking.Points.ToString(), labelPaint, valuePaint);
+            DrawFinalMetric(canvas, 344, 362, "Exatos", package.Ranking.ExactScores.ToString(), labelPaint, valuePaint);
+            DrawFinalMetric(canvas, 624, 362, "Classificados", package.Ranking.KnockoutQualifiedHits.ToString(), labelPaint, valuePaint);
+            DrawFinalMetric(canvas, 904, 362, "Brasil", package.Ranking.BrazilHits.ToString(), labelPaint, valuePaint);
+
+            DrawRoundedBlock(canvas, new SKRect(64, 508, 1136, 598), SubtleFill, SubtleBorder);
+            canvas.DrawText(TruncateText($"Melhor rodada: {package.BestRoundLabel}", bodyPaint, 990), 88, 546, bodyPaint);
+            canvas.DrawText(TruncateText($"Curiosidade: {package.CuriosityLabel}", metaPaint, 990), 88, 576, metaPaint);
+
+            if (package.IsChampion)
+            {
+                canvas.DrawText("Campanha campea confirmada apos a conclusao oficial do bolao.", 64, 634, metaPaint);
+            }
+            else if (!package.IsComplete)
+            {
+                canvas.DrawText("Previa administrativa: valores podem mudar ate o registro de todos os resultados.", 64, 634, metaPaint);
+            }
+            else
+            {
+                canvas.DrawText("Card final confirmado apos a conclusao oficial do bolao.", 64, 634, metaPaint);
+            }
+        });
+    }
+
     public byte[] RenderSpecialPng(SpecialAuditSnapshot snapshot)
     {
         var width = 1200;
@@ -368,7 +520,7 @@ public sealed class AuditImageService : IDisposable
 
             var footerY = y + 18;
             DrawRoundedBlock(canvas, new SKRect(64, footerY, 1436, footerY + 72), SubtleFill, SubtleBorder);
-            canvas.DrawText("Regras: exato +5 | resultado +3 | classificado +3 | jogos do Brasil dobram | mata-mata max. 8 antes da dobra", 86, footerY + 28, hashLabelPaint);
+            canvas.DrawText("Regras: grupos/32 base 5/3/3; oitavas em diante escalam por fase; jogos do Brasil dobram", 86, footerY + 28, hashLabelPaint);
             canvas.DrawText($"Hash SHA-256: {package.ProofHash}", 86, footerY + 58, hashPaint);
         });
     }
@@ -445,6 +597,38 @@ public sealed class AuditImageService : IDisposable
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()));
         return Convert.ToHexString(bytes);
+    }
+
+    private IReadOnlyList<RankingEntry> BuildFinalCardRanking(
+        IReadOnlyList<Participant> participants,
+        IReadOnlyDictionary<int, Match> matchesById,
+        IReadOnlyList<Prediction> predictions)
+    {
+        return participants
+            .Select(participant =>
+            {
+                var scored = predictions
+                    .Where(prediction => prediction.ParticipantId == participant.Id && matchesById.ContainsKey(prediction.MatchId))
+                    .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
+                    .ToList();
+
+                return new RankingEntry
+                {
+                    Participant = participant,
+                    Points = scored.Sum(score => score.Points),
+                    ExactScores = scored.Count(score => score.ExactScore),
+                    KnockoutQualifiedHits = scored.Count(score => score.QualifiedHit),
+                    BrazilHits = scored.Count(score => score.BrazilHit),
+                    ResultHits = scored.Count(score => score.ResultHit)
+                };
+            })
+            .OrderByDescending(entry => entry.Points)
+            .ThenByDescending(entry => entry.ExactScores)
+            .ThenByDescending(entry => entry.KnockoutQualifiedHits)
+            .ThenByDescending(entry => entry.BrazilHits)
+            .ThenByDescending(entry => entry.ResultHits)
+            .ThenBy(entry => entry.Participant.Name)
+            .ToList();
     }
 
     private static string BuildSpecialHash(Participant participant, SpecialPrediction prediction)
@@ -611,6 +795,13 @@ public sealed class AuditImageService : IDisposable
         DrawRoundedBlock(canvas, new SKRect(64, baselineY - 32, 1136, baselineY + 12), RowFill, RowBorder);
         canvas.DrawText(label, 88, baselineY - 4, labelPaint);
         canvas.DrawText(TruncateText(value, valuePaint, 810), 300, baselineY - 4, valuePaint);
+    }
+
+    private static void DrawFinalMetric(SKCanvas canvas, float x, float y, string label, string value, SKPaint labelPaint, SKPaint valuePaint)
+    {
+        DrawRoundedBlock(canvas, new SKRect(x, y, x + 232, y + 104), RowFill, RowBorder);
+        canvas.DrawText(label, x + 22, y + 34, labelPaint);
+        canvas.DrawText(value, x + 22, y + 78, valuePaint);
     }
 
     private SKPaint CreateTextPaint(float size, SKColor color, bool bold = false)

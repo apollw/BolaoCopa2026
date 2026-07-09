@@ -28,6 +28,7 @@ public class PerfilModel : PageModel
     public Participant? Participant { get; private set; }
     public IReadOnlyList<AvatarOption> AvatarOptions { get; private set; } = [];
     public ParticipantAvatarVisual? CurrentAvatar { get; private set; }
+    public bool CanDownloadFinalCard { get; private set; }
 
     [BindProperty]
     public string? SelectedAvatarKey { get; set; }
@@ -147,12 +148,27 @@ public class PerfilModel : PageModel
         return File(pdf, "application/pdf", fileName);
     }
 
+    public IActionResult OnGetDownloadFinalCard()
+    {
+        var package = _auditImageService.BuildFinalCardPackage(_repository.CurrentParticipantId);
+        if (package is null)
+        {
+            TempData["Status"] = "Card final indisponivel: aguarde a conclusao oficial de todos os jogos.";
+            return RedirectToPage();
+        }
+
+        var image = _auditImageService.RenderFinalCardPng(package);
+        var fileName = $"card-final-{package.Participant.Id}.png";
+        return File(image, "image/png", fileName);
+    }
+
     private void LoadData()
     {
         Participant = _repository.CurrentParticipant;
         AvatarOptions = AvatarCatalog.All;
         SelectedAvatarKey = Participant?.AvatarKey ?? "none";
         CurrentAvatar = ParticipantAvatarCatalog.Resolve(Participant);
+        CanDownloadFinalCard = _auditImageService.IsBolaoComplete();
     }
 
     private async Task<string> SaveAvatarImageAsync(IFormFile photo)

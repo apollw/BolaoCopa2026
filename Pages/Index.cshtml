@@ -53,6 +53,18 @@
     </div>
 </section>
 
+@if (Model.Stats.ChampionHighlight is not null)
+{
+    <section class="panel champion-spotlight">
+        <div>
+            <p class="eyebrow">Campeao do Bolao</p>
+            <h2>@Model.Stats.ChampionHighlight.ParticipantName</h2>
+            <p>Campanha finalizada com @Model.Stats.ChampionHighlight.Points pontos, @Model.Stats.ChampionHighlight.ExactScores placares exatos e @Model.Stats.ChampionHighlight.QualifiedHits classificados acertados.</p>
+        </div>
+        <strong>CAMPEAO</strong>
+    </section>
+}
+
 <section class="stats-grid" aria-label="Resumo da Copa">
     <article>
         <span>Partidas registradas</span>

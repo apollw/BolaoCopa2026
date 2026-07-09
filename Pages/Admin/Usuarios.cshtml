@@ -34,6 +34,16 @@
                     {
                         <small class="save-state">Possui palpite especial finalizado.</small>
                     }
+                    @if (!participant.IsAdmin)
+                    {
+                        <div class="form-actions">
+                            <a class="btn-app secondary"
+                               asp-page-handler="DownloadFinalCardPreview"
+                               asp-route-participantId="@participant.Id">
+                                Baixar previa do card
+                            </a>
+                        </div>
+                    }
                 </div>
                 <form method="post"
                       asp-page-handler="DeleteParticipant"

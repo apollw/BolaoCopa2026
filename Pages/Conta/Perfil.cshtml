@@ -189,6 +189,29 @@
             </button>
         </div>
     </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Card final</h2>
+            <span>resumo visual da sua campanha no bolao</span>
+        </div>
+
+        <p>Ao final do bolao, o card mostra sua pontuacao, colocacao, acertos e curiosidades da campanha. O campeao recebe um destaque especial.</p>
+
+        <div class="form-actions">
+            <button type="button"
+                    class="btn-app secondary"
+                    data-fetch-download-url="@Url.Page("/Conta/Perfil", "DownloadFinalCard")"
+                    data-loading-message="Gerando card final..."
+                    disabled="@(!Model.CanDownloadFinalCard)">
+                Baixar card final
+            </button>
+        </div>
+        @if (!Model.CanDownloadFinalCard)
+        {
+            <small class="save-state">Disponivel apos o registro de todos os resultados oficiais.</small>
+        }
+    </article>
 </section>
 
 @section Scripts {

@@ -120,6 +120,27 @@
   padding: 16px;
 }
 
+.champion-spotlight {
+  align-items: center;
+  background: radial-gradient(circle at 92% 12%, rgba(213, 169, 40, 0.28), transparent 28%),
+    linear-gradient(135deg, #123d32, #1f6f55);
+  border-color: rgba(213, 169, 40, 0.45);
+  color: #f8f3df;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+}
+
+.champion-spotlight h2,
+.champion-spotlight p {
+  color: inherit;
+}
+
+.champion-spotlight > strong {
+  font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 1;
+}
+
 .highlight-card {
   display: grid;
   gap: 14px;
