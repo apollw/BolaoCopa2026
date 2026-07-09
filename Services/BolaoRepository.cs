@@ -97,6 +97,9 @@ public sealed class BolaoRepository
         var totalPoints = ranking.Sum(entry => entry.Points);
         var draftPredictions = predictions.Count(prediction => prediction.SubmittedAt is null);
         var highlightCards = BuildHighlightCards(finalizedPredictions, scoredPredictions);
+        var champion = matches.Count > 0 && completed.Count == matches.Count && ranking.Count > 0
+            ? ranking.First()
+            : null;
 
         return new DashboardStats
         {
@@ -117,7 +120,14 @@ public sealed class BolaoRepository
             KnockoutQualifiedHits = qualifiedHits,
             BrazilHits = brazilHits,
             TotalPoints = totalPoints,
-            HighlightCards = highlightCards
+            HighlightCards = highlightCards,
+            ChampionHighlight = champion is null
+                ? null
+                : new DashboardChampionHighlight(
+                    champion.Participant.Name,
+                    champion.Points,
+                    champion.ExactScores,
+                    champion.KnockoutQualifiedHits)
         };
     }
 
