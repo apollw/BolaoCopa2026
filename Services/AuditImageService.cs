@@ -446,6 +446,7 @@ public sealed class AuditImageService : IDisposable
         return new ScoreAuditLine
         {
             OfficialNumber = match.OfficialNumber,
+            Phase = match.Phase,
             MatchLabel = $"{match.HomeTeam.Name} x {match.AwayTeam.Name}",
             Status = status,
             PredictionHomeGoals = prediction?.HomeGoals,
@@ -652,7 +653,7 @@ public sealed class AuditImageService : IDisposable
             canonical.AppendLine($"round:{round.Round.Id}|{round.Round.Name}|total:{round.TotalPoints}");
             foreach (var line in round.Lines.OrderBy(item => item.OfficialNumber))
             {
-                canonical.AppendLine($"{line.OfficialNumber}|{line.MatchLabel}|{line.PredictionHomeGoals?.ToString() ?? "-"}|{line.PredictionAwayGoals?.ToString() ?? "-"}|{line.PredictionQualifiedTeam ?? "-"}|{line.ResultHomeGoals?.ToString() ?? "-"}|{line.ResultAwayGoals?.ToString() ?? "-"}|{line.ResultQualifiedTeam ?? "-"}|{line.ExactScorePoints}|{line.ResultPoints}|{line.QualifiedPoints}|{line.BrazilMultiplier}|{line.TotalPoints}|{line.Status}");
+                canonical.AppendLine($"{line.OfficialNumber}|{line.Phase}|{line.MatchLabel}|{line.PredictionHomeGoals?.ToString() ?? "-"}|{line.PredictionAwayGoals?.ToString() ?? "-"}|{line.PredictionQualifiedTeam ?? "-"}|{line.ResultHomeGoals?.ToString() ?? "-"}|{line.ResultAwayGoals?.ToString() ?? "-"}|{line.ResultQualifiedTeam ?? "-"}|{line.ExactScorePoints}|{line.ResultPoints}|{line.QualifiedPoints}|{line.BrazilMultiplier}|{line.TotalPoints}|{line.Status}");
             }
         }
 
@@ -717,7 +718,8 @@ public sealed class AuditImageService : IDisposable
 
         if (line.QualifiedPoints > 0)
         {
-            parts.Add($"classificado +{line.QualifiedPoints}");
+            var label = line.Phase == CompetitionPhase.ThirdPlace ? "penaltis" : "classificado";
+            parts.Add($"{label} +{line.QualifiedPoints}");
         }
 
         if (line.BrazilMultiplier > 1)

@@ -60,8 +60,8 @@ public sealed class ScoringService
             CompetitionPhase.RoundOf16 => 7,
             CompetitionPhase.QuarterFinal => 9,
             CompetitionPhase.SemiFinal => 11,
-            CompetitionPhase.ThirdPlace => 11,
-            CompetitionPhase.Final => 13,
+            CompetitionPhase.ThirdPlace => 13,
+            CompetitionPhase.Final => 15,
             _ => 5
         };
     }
@@ -73,8 +73,8 @@ public sealed class ScoringService
             CompetitionPhase.RoundOf16 => 4,
             CompetitionPhase.QuarterFinal => 5,
             CompetitionPhase.SemiFinal => 6,
-            CompetitionPhase.ThirdPlace => 6,
-            CompetitionPhase.Final => 7,
+            CompetitionPhase.ThirdPlace => 8,
+            CompetitionPhase.Final => 9,
             _ => 3
         };
     }
@@ -86,8 +86,8 @@ public sealed class ScoringService
             CompetitionPhase.RoundOf16 => 4,
             CompetitionPhase.QuarterFinal => 5,
             CompetitionPhase.SemiFinal => 6,
-            CompetitionPhase.ThirdPlace => 6,
-            CompetitionPhase.Final => 7,
+            CompetitionPhase.ThirdPlace => 3,
+            CompetitionPhase.Final => 5,
             _ => 3
         };
     }

@@ -348,6 +348,7 @@ public sealed class ScoreAuditRound
 public sealed class ScoreAuditLine
 {
     public required int OfficialNumber { get; init; }
+    public CompetitionPhase Phase { get; init; }
     public required string MatchLabel { get; init; }
     public required string Status { get; init; }
     public int? PredictionHomeGoals { get; init; }
