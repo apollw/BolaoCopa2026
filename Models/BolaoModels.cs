@@ -107,10 +107,17 @@ public sealed class RankingEntry
 {
     public required Participant Participant { get; init; }
     public int Points { get; init; }
+    public int MatchPoints { get; init; }
+    public int SpecialPoints { get; init; }
+    public int SpecialChampionPoints { get; init; }
+    public int SpecialRunnerUpPoints { get; init; }
+    public int SpecialTopScorerPoints { get; init; }
+    public bool HasFinalizedSpecialPrediction { get; init; }
     public int ExactScores { get; init; }
     public int KnockoutQualifiedHits { get; init; }
     public int BrazilHits { get; init; }
     public int ResultHits { get; init; }
+    public bool HasSpecialScore => SpecialPoints > 0;
 }
 
 public sealed class DashboardStats
@@ -134,6 +141,7 @@ public sealed class DashboardStats
     public int TotalPoints { get; init; }
     public required IReadOnlyList<DashboardHighlightCard> HighlightCards { get; init; }
     public DashboardChampionHighlight? ChampionHighlight { get; init; }
+    public SpecialScoreboard? SpecialScoreboard { get; init; }
 }
 
 public sealed record DashboardChartSlice(string Label, int Value, string Color);
@@ -141,6 +149,25 @@ public sealed record DashboardChartSlice(string Label, int Value, string Color);
 public sealed record DashboardHighlightCard(string Title, string Value, string Caption);
 
 public sealed record DashboardChampionHighlight(string ParticipantName, int Points, int ExactScores, int QualifiedHits);
+
+public sealed class SpecialScoreboard
+{
+    public required string ChampionName { get; init; }
+    public required string RunnerUpName { get; init; }
+    public required string TopScorerName { get; init; }
+    public required IReadOnlyList<SpecialScoreboardEntry> Entries { get; init; }
+}
+
+public sealed class SpecialScoreboardEntry
+{
+    public required Participant Participant { get; init; }
+    public int TotalPoints { get; init; }
+    public int ChampionPoints { get; init; }
+    public int RunnerUpPoints { get; init; }
+    public int TopScorerPoints { get; init; }
+}
+
+public sealed record SpecialScoringContext(string ChampionCode, string RunnerUpCode, string TopScorerName);
 
 public sealed class PublicPredictionsWallView
 {

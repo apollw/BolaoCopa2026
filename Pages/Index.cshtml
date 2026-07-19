@@ -65,6 +65,101 @@
     </section>
 }
 
+@if (Model.Stats.SpecialScoreboard is not null)
+{
+    <section class="panel special-scoreboard">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Pontuacao Especial</p>
+                <h2>Palpites especiais computados</h2>
+                <span>Campeao: @Model.Stats.SpecialScoreboard.ChampionName | Vice: @Model.Stats.SpecialScoreboard.RunnerUpName | Artilheiro: @Model.Stats.SpecialScoreboard.TopScorerName</span>
+            </div>
+        </div>
+
+        @if (Model.Stats.SpecialScoreboard.Entries.Count == 0)
+        {
+            <div class="notice">Nenhum palpite especial finalizado para computar.</div>
+        }
+        else
+        {
+            <div class="special-score-list">
+                @foreach (var entry in Model.Stats.SpecialScoreboard.Entries)
+                {
+                    var avatar = Model.GetParticipantAvatar(entry.Participant);
+                    <article class="special-score-card">
+                        <strong class="ranking-name-with-avatar">
+                            <span class="participant-avatar avatar-sm">
+                                @if (avatar.ImageUrl is not null)
+                                {
+                                    <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span>@avatar.Symbol</span>
+                                }
+                            </span>
+                            <span>@entry.Participant.Name</span>
+                        </strong>
+                        <span class="special-score-total">+@entry.TotalPoints pts</span>
+                        <small>Campeao +@entry.ChampionPoints | Vice +@entry.RunnerUpPoints | Artilheiro +@entry.TopScorerPoints</small>
+                    </article>
+                }
+            </div>
+        }
+
+        <div class="final-score-audit">
+            <div class="panel-heading compact-heading">
+                <div>
+                    <h3>Resumo final de pontos</h3>
+                    <span>auditoria consolidada: jogos + palpites especiais</span>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="app-table final-score-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Participante</th>
+                            <th>Jogos</th>
+                            <th>Especiais</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var index = 0; index < Model.Stats.Ranking.Count; index++)
+                        {
+                            var entry = Model.Stats.Ranking[index];
+                            var avatar = Model.GetParticipantAvatar(entry.Participant);
+                            <tr>
+                                <td data-label="#">@(index + 1)</td>
+                                <td data-label="Participante">
+                                    <span class="ranking-name-with-avatar">
+                                        <span class="participant-avatar avatar-sm">
+                                            @if (avatar.ImageUrl is not null)
+                                            {
+                                                <img src="@avatar.ImageUrl" alt="" loading="lazy" />
+                                            }
+                                            else
+                                            {
+                                                <span>@avatar.Symbol</span>
+                                            }
+                                        </span>
+                                        <span>@entry.Participant.Name</span>
+                                    </span>
+                                </td>
+                                <td data-label="Jogos">@entry.MatchPoints</td>
+                                <td data-label="Especiais">+@entry.SpecialPoints</td>
+                                <td data-label="Total"><strong>@entry.Points</strong></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+}
+
 <section class="stats-grid" aria-label="Resumo da Copa">
     <article>
         <span>Partidas registradas</span>

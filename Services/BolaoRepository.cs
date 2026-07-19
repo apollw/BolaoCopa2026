@@ -77,8 +77,12 @@ public sealed class BolaoRepository
         var predictions = _db.Predictions
             .AsNoTracking()
             .ToList();
+        var specialPredictions = _db.SpecialPredictions
+            .AsNoTracking()
+            .ToList();
         var matchesById = matches.ToDictionary(match => match.Id);
-        var ranking = BuildRanking(participants, matchesById, predictions);
+        var specialContext = BuildSpecialScoringContext(matches);
+        var ranking = BuildRanking(participants, matchesById, predictions, specialPredictions, specialContext);
         var groupStandings = BuildGroupStandings(matches);
         var completed = matches.Where(match => match.Result is not null).ToList();
         var finalizedPredictions = predictions.Where(prediction => prediction.SubmittedAt != null).ToList();
@@ -97,6 +101,7 @@ public sealed class BolaoRepository
         var totalPoints = ranking.Sum(entry => entry.Points);
         var draftPredictions = predictions.Count(prediction => prediction.SubmittedAt is null);
         var highlightCards = BuildHighlightCards(finalizedPredictions, scoredPredictions);
+        var specialScoreboard = BuildSpecialScoreboard(ranking, specialContext);
         var champion = matches.Count > 0 && completed.Count == matches.Count && ranking.Count > 0
             ? ranking.First()
             : null;
@@ -121,6 +126,7 @@ public sealed class BolaoRepository
             BrazilHits = brazilHits,
             TotalPoints = totalPoints,
             HighlightCards = highlightCards,
+            SpecialScoreboard = specialScoreboard,
             ChampionHighlight = champion is null
                 ? null
                 : new DashboardChampionHighlight(
@@ -996,8 +1002,11 @@ public sealed class BolaoRepository
             .AsNoTracking()
             .Where(prediction => prediction.SubmittedAt != null)
             .ToList();
+        var specialPredictions = _db.SpecialPredictions
+            .AsNoTracking()
+            .ToList();
 
-        return BuildRanking(participants, matches, predictions);
+        return BuildRanking(participants, matches, predictions, specialPredictions, BuildSpecialScoringContext(matches.Values));
     }
 
     public bool IsRoundFinalized(int participantId, int roundId)
@@ -1062,8 +1071,14 @@ public sealed class BolaoRepository
     private IReadOnlyList<RankingEntry> BuildRanking(
         IReadOnlyList<Participant> participants,
         IReadOnlyDictionary<int, Match> matchesById,
-        IReadOnlyList<Prediction> predictions)
+        IReadOnlyList<Prediction> predictions,
+        IReadOnlyList<SpecialPrediction>? specialPredictions = null,
+        SpecialScoringContext? specialContext = null)
     {
+        var specialPredictionsByParticipant = specialPredictions?
+            .Where(prediction => prediction.IsFinal)
+            .ToDictionary(prediction => prediction.ParticipantId) ?? [];
+
         return participants
             .Select(participant =>
             {
@@ -1071,11 +1086,22 @@ public sealed class BolaoRepository
                     .Where(prediction => prediction.ParticipantId == participant.Id)
                     .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
                     .ToList();
+                specialPredictionsByParticipant.TryGetValue(participant.Id, out var specialPrediction);
+                var specialScore = specialContext is null
+                    ? SpecialScore.Empty
+                    : _scoringService.ScoreSpecial(specialPrediction, specialContext.ChampionCode, specialContext.RunnerUpCode);
+                var matchPoints = scored.Sum(score => score.Points);
 
                 return new RankingEntry
                 {
                     Participant = participant,
-                    Points = scored.Sum(score => score.Points),
+                    MatchPoints = matchPoints,
+                    SpecialPoints = specialScore.Points,
+                    SpecialChampionPoints = specialScore.ChampionPoints,
+                    SpecialRunnerUpPoints = specialScore.RunnerUpPoints,
+                    SpecialTopScorerPoints = specialScore.TopScorerPoints,
+                    HasFinalizedSpecialPrediction = specialPrediction?.IsFinal == true,
+                    Points = matchPoints + specialScore.Points,
                     ExactScores = scored.Count(score => score.ExactScore),
                     KnockoutQualifiedHits = scored.Count(score => score.QualifiedHit),
                     BrazilHits = scored.Count(score => score.BrazilHit),
@@ -1089,6 +1115,82 @@ public sealed class BolaoRepository
             .ThenByDescending(entry => entry.ResultHits)
             .ThenBy(entry => entry.Participant.Name)
             .ToList();
+    }
+
+    private static SpecialScoringContext? BuildSpecialScoringContext(IEnumerable<Match> matches)
+    {
+        var final = matches.SingleOrDefault(match => match.Phase == CompetitionPhase.Final);
+        if (final?.Result is null)
+        {
+            return null;
+        }
+
+        var championCode = ResolveFinalChampionCode(final);
+        var runnerUpCode = ResolveFinalRunnerUpCode(final, championCode);
+        if (string.IsNullOrWhiteSpace(championCode) || string.IsNullOrWhiteSpace(runnerUpCode))
+        {
+            return null;
+        }
+
+        return new SpecialScoringContext(championCode, runnerUpCode, ScoringService.ActualTopScorer);
+    }
+
+    private static string? ResolveFinalChampionCode(Match final)
+    {
+        if (!string.IsNullOrWhiteSpace(final.Result?.QualifiedTeamCode))
+        {
+            return final.Result.QualifiedTeamCode;
+        }
+
+        return final.Result switch
+        {
+            null => null,
+            _ when final.Result.HomeGoals > final.Result.AwayGoals => final.HomeTeam.Code,
+            _ when final.Result.AwayGoals > final.Result.HomeGoals => final.AwayTeam.Code,
+            _ => null
+        };
+    }
+
+    private static string? ResolveFinalRunnerUpCode(Match final, string? championCode)
+    {
+        return championCode switch
+        {
+            null or "" => null,
+            _ when championCode == final.HomeTeam.Code => final.AwayTeam.Code,
+            _ when championCode == final.AwayTeam.Code => final.HomeTeam.Code,
+            _ => null
+        };
+    }
+
+    private static SpecialScoreboard? BuildSpecialScoreboard(IReadOnlyList<RankingEntry> ranking, SpecialScoringContext? context)
+    {
+        if (context is null)
+        {
+            return null;
+        }
+
+        var entries = ranking
+            .Where(entry => entry.HasFinalizedSpecialPrediction)
+            .OrderByDescending(entry => entry.SpecialPoints)
+            .ThenByDescending(entry => entry.Points)
+            .ThenBy(entry => entry.Participant.Name)
+            .Select(entry => new SpecialScoreboardEntry
+            {
+                Participant = entry.Participant,
+                TotalPoints = entry.SpecialPoints,
+                ChampionPoints = entry.SpecialChampionPoints,
+                RunnerUpPoints = entry.SpecialRunnerUpPoints,
+                TopScorerPoints = entry.SpecialTopScorerPoints
+            })
+            .ToList();
+
+        return new SpecialScoreboard
+        {
+            ChampionName = TeamCatalog.ResolveName(context.ChampionCode),
+            RunnerUpName = TeamCatalog.ResolveName(context.RunnerUpCode),
+            TopScorerName = "Mbappe",
+            Entries = entries
+        };
     }
 
     private IReadOnlyList<GroupStanding> BuildGroupStandings(IReadOnlyList<Match> matches)

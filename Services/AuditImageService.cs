@@ -140,8 +140,9 @@ public sealed class AuditImageService : IDisposable
             .OrderBy(item => item.Name)
             .ToList();
         var predictions = _db.Predictions.AsNoTracking().ToList();
+        var specialPredictions = _db.SpecialPredictions.AsNoTracking().ToList();
         var matchesById = matches.ToDictionary(match => match.Id);
-        var ranking = BuildFinalCardRanking(participants, matchesById, predictions);
+        var ranking = BuildFinalCardRanking(participants, matchesById, predictions, specialPredictions, BuildSpecialScoringContext(matches));
         var rankingEntry = ranking.SingleOrDefault(entry => entry.Participant.Id == participantId);
         if (rankingEntry is null)
         {
@@ -603,8 +604,14 @@ public sealed class AuditImageService : IDisposable
     private IReadOnlyList<RankingEntry> BuildFinalCardRanking(
         IReadOnlyList<Participant> participants,
         IReadOnlyDictionary<int, Match> matchesById,
-        IReadOnlyList<Prediction> predictions)
+        IReadOnlyList<Prediction> predictions,
+        IReadOnlyList<SpecialPrediction> specialPredictions,
+        SpecialScoringContext? specialContext)
     {
+        var specialPredictionsByParticipant = specialPredictions
+            .Where(prediction => prediction.IsFinal)
+            .ToDictionary(prediction => prediction.ParticipantId);
+
         return participants
             .Select(participant =>
             {
@@ -612,11 +619,22 @@ public sealed class AuditImageService : IDisposable
                     .Where(prediction => prediction.ParticipantId == participant.Id && matchesById.ContainsKey(prediction.MatchId))
                     .Select(prediction => _scoringService.Score(matchesById[prediction.MatchId], prediction))
                     .ToList();
+                specialPredictionsByParticipant.TryGetValue(participant.Id, out var specialPrediction);
+                var specialScore = specialContext is null
+                    ? SpecialScore.Empty
+                    : _scoringService.ScoreSpecial(specialPrediction, specialContext.ChampionCode, specialContext.RunnerUpCode);
+                var matchPoints = scored.Sum(score => score.Points);
 
                 return new RankingEntry
                 {
                     Participant = participant,
-                    Points = scored.Sum(score => score.Points),
+                    MatchPoints = matchPoints,
+                    SpecialPoints = specialScore.Points,
+                    SpecialChampionPoints = specialScore.ChampionPoints,
+                    SpecialRunnerUpPoints = specialScore.RunnerUpPoints,
+                    SpecialTopScorerPoints = specialScore.TopScorerPoints,
+                    HasFinalizedSpecialPrediction = specialPrediction?.IsFinal == true,
+                    Points = matchPoints + specialScore.Points,
                     ExactScores = scored.Count(score => score.ExactScore),
                     KnockoutQualifiedHits = scored.Count(score => score.QualifiedHit),
                     BrazilHits = scored.Count(score => score.BrazilHit),
@@ -630,6 +648,51 @@ public sealed class AuditImageService : IDisposable
             .ThenByDescending(entry => entry.ResultHits)
             .ThenBy(entry => entry.Participant.Name)
             .ToList();
+    }
+
+    private static SpecialScoringContext? BuildSpecialScoringContext(IEnumerable<Match> matches)
+    {
+        var final = matches.SingleOrDefault(match => match.Phase == CompetitionPhase.Final);
+        if (final?.Result is null)
+        {
+            return null;
+        }
+
+        var championCode = ResolveFinalChampionCode(final);
+        var runnerUpCode = ResolveFinalRunnerUpCode(final, championCode);
+        if (string.IsNullOrWhiteSpace(championCode) || string.IsNullOrWhiteSpace(runnerUpCode))
+        {
+            return null;
+        }
+
+        return new SpecialScoringContext(championCode, runnerUpCode, ScoringService.ActualTopScorer);
+    }
+
+    private static string? ResolveFinalChampionCode(Match final)
+    {
+        if (!string.IsNullOrWhiteSpace(final.Result?.QualifiedTeamCode))
+        {
+            return final.Result.QualifiedTeamCode;
+        }
+
+        return final.Result switch
+        {
+            null => null,
+            _ when final.Result.HomeGoals > final.Result.AwayGoals => final.HomeTeam.Code,
+            _ when final.Result.AwayGoals > final.Result.HomeGoals => final.AwayTeam.Code,
+            _ => null
+        };
+    }
+
+    private static string? ResolveFinalRunnerUpCode(Match final, string? championCode)
+    {
+        return championCode switch
+        {
+            null or "" => null,
+            _ when championCode == final.HomeTeam.Code => final.AwayTeam.Code,
+            _ when championCode == final.AwayTeam.Code => final.HomeTeam.Code,
+            _ => null
+        };
     }
 
     private static string BuildSpecialHash(Participant participant, SpecialPrediction prediction)

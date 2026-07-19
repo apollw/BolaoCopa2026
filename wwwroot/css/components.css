@@ -141,6 +141,54 @@
   line-height: 1;
 }
 
+.special-scoreboard {
+  background: linear-gradient(135deg, #fff8df 0%, #f5ead0 52%, #eef5e6 100%);
+  border-color: #e0c46b;
+}
+
+.special-score-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.special-score-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(138, 95, 0, 0.22);
+  border-radius: 14px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.special-score-total {
+  color: #8a5f00;
+  font-size: 1.45rem;
+  font-weight: 900;
+}
+
+.final-score-audit {
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(18, 61, 50, 0.12);
+  border-radius: 16px;
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.compact-heading {
+  margin-bottom: 10px;
+}
+
+.final-score-table {
+  min-width: 620px;
+}
+
+.final-score-table td:last-child,
+.final-score-table th:last-child {
+  color: #123d32;
+  text-align: right;
+}
+
 .highlight-card {
   display: grid;
   gap: 14px;
