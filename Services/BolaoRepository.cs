@@ -479,12 +479,15 @@ public sealed class BolaoRepository
             .Select(match =>
             {
                 var hasStarted = HasMatchStarted(match, now);
+                var prediction = participantPredictions.GetValueOrDefault(match.Id);
                 return new MatchPredictionView
                 {
                     Match = match,
-                    Prediction = participantPredictions.GetValueOrDefault(match.Id),
+                    Prediction = prediction,
                     HasStarted = hasStarted,
-                    CanEdit = !isLocked && !isFinalized,
+                    CanEdit = !isFinalized
+                        && prediction?.IsFinal != true
+                        && (!isLocked || CanUseFinalDraftException(match, prediction, now)),
                     DisplayLabel = GetMatchDisplayLabel(match)
                 };
             })
@@ -609,7 +612,11 @@ public sealed class BolaoRepository
             return false;
         }
 
-        if (!IsRoundAvailable(participantId, match.RoundId, out var lockReason))
+        var now = DateTimeOffset.UtcNow;
+        var existing = _db.Predictions.SingleOrDefault(item => item.ParticipantId == participantId && item.MatchId == matchId);
+        var canUseFinalException = CanUseFinalDraftException(match, existing, now);
+
+        if (!IsRoundAvailable(participantId, match.RoundId, out var lockReason) && !canUseFinalException)
         {
             message = lockReason ?? "Esta rodada ainda esta bloqueada.";
             return false;
@@ -621,13 +628,12 @@ public sealed class BolaoRepository
             return false;
         }
 
-        if (IsRoundDraftLocked(match.RoundId, out var draftLockReason))
+        if (IsRoundDraftLocked(match.RoundId, out var draftLockReason) && !canUseFinalException)
         {
             message = draftLockReason ?? "Os palpites desta rodada estao bloqueados.";
             return false;
         }
 
-        var existing = _db.Predictions.SingleOrDefault(item => item.ParticipantId == participantId && item.MatchId == matchId);
         if (existing?.IsFinal == true)
         {
             message = "Esta rodada ja foi finalizada. O palpite esta bloqueado.";
@@ -663,7 +669,12 @@ public sealed class BolaoRepository
     {
         AutoFinalizeStartedPredictionsAndRounds();
 
-        if (!IsRoundAvailable(participantId, roundId, out var lockReason))
+        var now = DateTimeOffset.UtcNow;
+        var hasFinalException = HasOpenFinalDraftException(roundId, participantId, now);
+        var isRoundAvailable = IsRoundAvailable(participantId, roundId, out var lockReason);
+        var isRoundDraftLocked = IsRoundDraftLocked(roundId, out var draftLockReason);
+
+        if (!isRoundAvailable && !hasFinalException)
         {
             message = lockReason ?? "Esta rodada ainda esta bloqueada.";
             return false;
@@ -675,13 +686,12 @@ public sealed class BolaoRepository
             return false;
         }
 
-        if (IsRoundDraftLocked(roundId, out var draftLockReason))
+        if (isRoundDraftLocked && !hasFinalException)
         {
             message = draftLockReason ?? "Os palpites desta rodada estao bloqueados.";
             return false;
         }
 
-        var now = DateTimeOffset.UtcNow;
         var roundMatches = _db.Matches
             .Where(match => match.RoundId == roundId)
             .ToDictionary(match => match.Id);
@@ -702,6 +712,14 @@ public sealed class BolaoRepository
             }
 
             existingPredictions.TryGetValue(draft.MatchId, out var existing);
+            var canEditThisMatch = existing?.IsFinal != true
+                && ((!isRoundDraftLocked && isRoundAvailable) || CanUseFinalDraftException(match, existing, now));
+            if (!canEditThisMatch)
+            {
+                lockedCount++;
+                continue;
+            }
+
             var qualifiedTeamCode = string.IsNullOrWhiteSpace(draft.QualifiedTeamCode)
                 ? null
                 : draft.QualifiedTeamCode.Trim();
@@ -722,12 +740,6 @@ public sealed class BolaoRepository
             if (!draft.HomeGoals.HasValue || !draft.AwayGoals.HasValue)
             {
                 incompleteCount++;
-                continue;
-            }
-
-            if (existing?.IsFinal == true)
-            {
-                lockedCount++;
                 continue;
             }
 
@@ -1307,6 +1319,29 @@ public sealed class BolaoRepository
     private static bool HasMatchStarted(Match match, DateTimeOffset? now = null)
     {
         return (now ?? DateTimeOffset.UtcNow) >= match.Kickoff.ToUniversalTime();
+    }
+
+    private static bool CanUseFinalDraftException(Match match, Prediction? prediction, DateTimeOffset? now = null)
+    {
+        return match.Phase == CompetitionPhase.Final
+            && prediction?.IsFinal != true
+            && !HasMatchStarted(match, now);
+    }
+
+    private bool HasOpenFinalDraftException(int roundId, int participantId, DateTimeOffset? now = null)
+    {
+        var finalMatch = _db.Matches
+            .AsNoTracking()
+            .SingleOrDefault(match => match.RoundId == roundId && match.Phase == CompetitionPhase.Final);
+        if (finalMatch is null)
+        {
+            return false;
+        }
+
+        var prediction = _db.Predictions
+            .AsNoTracking()
+            .SingleOrDefault(item => item.ParticipantId == participantId && item.MatchId == finalMatch.Id);
+        return CanUseFinalDraftException(finalMatch, prediction, now);
     }
 
     private DateTimeOffset? GetRoundDraftLockTime(int roundId)

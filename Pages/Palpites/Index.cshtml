@@ -2,6 +2,10 @@
 @model BolaoCopa2026.Pages.Palpites.IndexModel
 @{
     ViewData["Title"] = "Palpites";
+    var hasEditableDrafts = Model.RoundView.Matches.Any(item => item.CanEdit);
+    var effectiveDraftLockUtc = Model.RoundView.IsLocked && hasEditableDrafts
+        ? Model.RoundView.Matches.Where(item => item.CanEdit).Max(item => item.Match.Kickoff.ToUniversalTime())
+        : Model.RoundView.DraftLockUtc;
     var confirmMessage = Model.RoundView.MissingCount > 0
         ? $"Finalizar esta rodada? Voce tem {Model.RoundView.MissingCount} partida(s) sem palpite, que ficarao em branco. Depois da confirmacao nao sera possivel adicionar nem editar palpites."
         : "Finalizar esta rodada? Depois da confirmacao nao sera possivel adicionar nem editar palpites.";
@@ -24,7 +28,7 @@
             <span>@Model.RoundView.Round.StartsOn.ToString("dd/MM") a @Model.RoundView.Round.EndsOn.ToString("dd/MM")</span>
         </div>
         <div class="round-status @(Model.RoundView.IsFinalized ? "final" : "draft")">
-            @(Model.RoundView.IsLocked ? "bloqueada" : Model.RoundView.IsFinalized ? "finalizada" : $"{Model.RoundView.DraftCount} rascunhos")
+            @(Model.RoundView.IsLocked && hasEditableDrafts ? "final liberada" : Model.RoundView.IsLocked ? "bloqueada" : Model.RoundView.IsFinalized ? "finalizada" : $"{Model.RoundView.DraftCount} rascunhos")
         </div>
     </div>
 
@@ -36,7 +40,11 @@
         }
     </nav>
 
-    @if (Model.RoundView.IsLocked)
+    @if (Model.RoundView.IsLocked && hasEditableDrafts)
+    {
+        <div class="notice">Excecao ativa: apenas o jogo da final esta liberado para palpites ainda nao finalizados, ate @effectiveDraftLockUtc?.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"). O terceiro lugar permanece bloqueado.</div>
+    }
+    else if (Model.RoundView.IsLocked)
     {
         <div class="notice">@Model.RoundView.LockReason</div>
     }
@@ -45,9 +53,9 @@
         <div class="notice">Voce ainda tem @Model.RoundView.MissingCount partida(s) sem palpite. Se finalizar agora, elas ficarao em branco e nao poderao mais ser preenchidas.</div>
     }
 
-    @if (!Model.RoundView.IsFinalized && Model.RoundView.DraftLockUtc is not null)
+    @if (!Model.RoundView.IsFinalized && effectiveDraftLockUtc is not null)
     {
-        <div class="notice">Os rascunhos travam em @Model.RoundView.DraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"), no inicio da primeira partida desta rodada. Depois disso, nao sera mais possivel editar esta rodada.</div>
+        <div class="notice">Os rascunhos travam em @effectiveDraftLockUtc.Value.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM HH:mm"). Depois disso, nao sera mais possivel editar os jogos liberados.</div>
     }
 
     @if (!Model.RoundView.IsFinalized && Model.RoundView.StartedWithoutPredictionCount > 0)
@@ -58,8 +66,8 @@
     <form id="round-drafts-form"
           method="post"
           asp-page-handler="SaveAllDrafts"
-          data-draft-lock-utc="@Model.RoundView.DraftLockUtc?.ToUniversalTime().ToString("O")"
-          data-round-editable="@((!Model.RoundView.IsLocked && !Model.RoundView.IsFinalized).ToString().ToLowerInvariant())">
+          data-draft-lock-utc="@effectiveDraftLockUtc?.ToUniversalTime().ToString("O")"
+          data-round-editable="@hasEditableDrafts.ToString().ToLowerInvariant()">
         <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
 
         <div class="match-list">
@@ -135,13 +143,13 @@
         <p>Enquanto a rodada nao for finalizada, os palpites ficam salvos como rascunho no perfil. O comprovante de auditoria so libera depois da finalizacao.</p>
         <p>Os rascunhos sao salvos automaticamente alguns segundos apos cada alteracao. Se preferir, voce tambem pode salvar tudo manualmente.</p>
         <p>Os rascunhos travam no inicio da primeira partida desta rodada. Ate esse horario, ainda e possivel adicionar ou editar palpites; depois disso, o que estiver salvo permanece como rascunho ate a finalizacao da rodada.</p>
-        @if (!Model.RoundView.IsFinalized && !Model.RoundView.IsLocked)
+        @if (!Model.RoundView.IsFinalized && hasEditableDrafts)
         {
             <small id="draft-save-status" class="save-state">Autosave ativo. As alteracoes desta rodada serao salvas automaticamente.</small>
         }
     </div>
     <div class="action-buttons">
-        <button type="submit" form="round-drafts-form" class="btn-app" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Salvar rascunhos</button>
+        <button type="submit" form="round-drafts-form" class="btn-app" disabled="@(!hasEditableDrafts)">Salvar rascunhos</button>
         <form method="post" asp-page-handler="FinalizeRound" onsubmit="return confirm('@confirmMessage');">
             <input type="hidden" name="roundId" value="@Model.RoundView.Round.Id" />
             <button type="submit" class="btn-app danger" disabled="@(Model.RoundView.IsFinalized || Model.RoundView.IsLocked)">Finalizar rodada</button>
