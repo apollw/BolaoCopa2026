@@ -74,7 +74,15 @@ Vercel nao e a melhor opcao para este projeto porque a aplicacao e ASP.NET Core 
 
 - `Program.cs`: registra Razor Pages, EF Core PostgreSQL/Supabase, autenticacao por cookie, policies de autorizacao, `BolaoRepository`, `ScoringService` e executa migrations/seed.
 - `Data/BolaoDbContext.cs`: mapeamento EF Core das entidades.
-- `Models/BolaoModels.cs`: modelos de dominio e view models.
+- `Models/Competition/*`: tipos centrais da Copa, partidas, rodadas, resultados e classificacao de grupos.
+- `Models/Participants/*`: participante e dados de perfil.
+- `Models/Predictions/*`: palpites, fechamento de rodada e view models de preenchimento.
+- `Models/Ranking/*`: ranking e contexto de pontuacao especial.
+- `Models/Dashboard/*`: estatisticas e cards da pagina inicial.
+- `Models/Public/*`: DTOs/view models do mural publico de palpites.
+- `Models/Auditing/*`: snapshots, linhas e pacotes de auditoria/comprovantes.
+- `Models/MessageBoard/*`: entidades e view models do mural de mensagens.
+- `Models/Catalogs/*`: catalogos auxiliares de times, exibicao de times, avatares e humores.
 - `Services/BolaoRepository.cs`: principal camada de acesso/regras de aplicacao.
 - `Services/BolaoSeedData.cs`: seed inicial apenas de rodadas e jogos da Copa.
 - `Services/ScoringService.cs`: regra de pontuacao.
